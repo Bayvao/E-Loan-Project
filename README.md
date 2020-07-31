@@ -5,10 +5,11 @@ o The Main purpose of E-Loans is to provide the ability to initiate a new mortga
 o The Application, with welcome Home page for the designated users, will allow three types of users,CLERK, MANAGER, and ADMIN to log into the portal with a set of task assigned to each.
 
 The E-Loans application is expected to be used by the Credits Dept to perform the following functions:
-  Create new loans
-  Approval of new loan requests by authorized approver
-  Automatic generation of payment schedule and amount
-  Processing of payments received to update loan balance; recalculation of payment schedule and amount
+   
+   1. Create new loans
+   2. Approval of new loan requests by authorized approver
+   3. Automatic generation of payment schedule and amount
+   4. Processing of payments received to update loan balance; recalculation of payment schedule and amount
 
 The below roles will apply on this application -
 
@@ -22,3 +23,6 @@ MANAGER-
 ADMIN-
    1. Can create new user and assign a role. 
    2. This user can also delete and change the password of a user.
+
+
+The Application will also send messages and email to the user.

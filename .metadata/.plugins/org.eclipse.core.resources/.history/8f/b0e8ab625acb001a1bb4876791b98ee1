@@ -1,0 +1,27 @@
+spring.mvc.view.prefix=/WEB-INF/views/
+spring.mvc.view.suffix=.jsp
+
+#
+# JDBC properties
+#
+app.datasource.jdbc-url=jdbc:mysql://localhost:3306/bank_eloan?useSSL=false&serverTimezone=UTC
+app.datasource.username=root
+app.datasource.password=Bayvao@8759
+
+# Spring Data JPA properties
+spring.data.jpa.repository.packages=com.elaon.dao
+spring.data.jpa.entity.packages-to-scan=com.elaon.entity
+
+#
+# SECURITY JDBC properties
+#
+security.datasource.jdbc-url=jdbc:mysql://localhost:3306/eloan_directory?useSSL=false&serverTimezone=UTC
+security.datasource.username=root
+security.datasource.password=Bayvao@8759
+
+#
+# Twilio Properties
+#
+TWILIO_ACCOUNT_SID=
+TWILIO_AUTH_TOKEN=
+

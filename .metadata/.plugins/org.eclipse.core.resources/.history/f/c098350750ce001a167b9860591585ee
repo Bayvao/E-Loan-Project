@@ -1,0 +1,11 @@
+package com.elaon.service;
+
+import com.elaon.model.Payment;
+
+public interface LoanPaymentService {
+
+	public void addPayment(Payment payment);
+	
+	public boolean loanNumberExist(Long loanNumber);
+
+}

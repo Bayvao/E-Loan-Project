@@ -1,0 +1,95 @@
+<%@ taglib prefix="form" uri="http://www.springframework.org/tags/form"%>
+<%@ taglib prefix="security"
+	uri="http://www.springframework.org/security/tags"%>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+
+<title>Loan Details Form</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<link rel="stylesheet" href="http://code.jquery.com/ui/1.10.2/themes/smoothness/jquery-ui.css" />
+<script src="http://code.jquery.com/jquery-1.9.1.js"></script>
+<script src="http://code.jquery.com/ui/1.10.2/jquery-ui.js"></script>
+
+<link rel="stylesheet"
+	href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css">
+<script
+	src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+<script
+	src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js"></script>
+<style>
+.error {
+	color: red;
+}
+</style>
+<script>
+$(function(){
+    $('#datepicker').datepicker({
+        maxDate: 0
+    });
+});
+</script>
+
+</head>
+<body>
+<div class="container">
+	<!-- Add a logout button -->
+	<form:form action="${pageContext.request.contextPath}/logout"
+		method="POST">
+
+		<input type="submit" value="Logout" />
+
+	</form:form>
+
+	<!-- display user name and role -->
+
+	<p>
+
+		<security:authorize access="isAuthenticated()">  
+        User: <security:authentication property="principal.username" />
+        Role(s): <security:authentication
+				property="principal.authorities" />
+		</security:authorize>
+	</p>
+
+	<hr>
+	<h2>Loan Details</h2>
+	<form:form
+		action="${pageContext.request.contextPath}/loan/processLoanDetails"
+		modelAttribute="loanDetails">
+		<div>
+			<label>Loan Type:</label>
+			<form:select path="loanType" class="form-control" >
+				<form:option value="Home Equity Loans">Home Equity Loans</form:option>
+                <form:option value="Mortgages">Mortgages</form:option>
+                <form:option value="Personal Loan">Personal Loan</form:option>
+                <form:option value="Small Business Loans">Small Business Loans</form:option>
+			
+			</form:select>
+		</div>
+		<br>
+		<div>
+			<label>Loan Amount:</label>
+			<form:input path="amtRequested" placeholder="Loan Amount Requested"
+				class="form-control" />
+			<form:errors path="amtRequested" cssClass="error" />
+		</div>
+		<br>
+		<div>
+			<label>Application Date:</label>
+			<form:input path="applicationDate" placeholder="Loan Application Date"
+				id="datepicker" />
+			<form:errors path="applicationDate" cssClass="error" />
+		</div>
+		<br>
+		<div>
+			<button type="submit" class="btn btn-blue text-center">Submit</button>
+		</div>
+	</form:form>
+	</div>
+
+</body>
+</html>

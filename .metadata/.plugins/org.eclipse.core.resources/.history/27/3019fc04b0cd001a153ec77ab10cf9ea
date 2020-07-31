@@ -1,0 +1,75 @@
+package com.elaon.service;
+
+import javax.transaction.Transactional;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import com.elaon.dao.LoanAcceptanceRepository;
+import com.elaon.dao.LoanAmortizationRepository;
+import com.elaon.dao.LoanStatusRepository;
+import com.elaon.entity.LoanAcceptance;
+import com.elaon.entity.LoanAmortization;
+import com.elaon.entity.LoanStatus;
+import com.elaon.model.AcceptLoan;
+import com.elaon.model.Amortization;
+
+@Service
+public class LoanAcceptanceServiceImpl implements LoanAcceptanceService {
+
+	@Autowired
+	LoanAcceptanceRepository laRepo;
+
+	@Autowired
+	LoanAmortizationRepository lmRepo;
+	
+	@Autowired
+	LoanStatusRepository lsr;
+
+
+	@Override
+	@Transactional
+	public Long updateAndAdd(LoanStatus loanStatus, AcceptLoan loanAccept, Amortization loanAmortization) {
+
+		LoanAcceptance accept = new LoanAcceptance();
+		
+		accept.setLoanId(loanAccept.getLoanId());
+		accept.setSanctioningOffical(loanAccept.getSancOffical());
+		accept.setRegionalOffice(loanAccept.getRegOffice());
+		accept.setSanctionedDate(loanAccept.getSancDate());
+		
+
+		laRepo.save(accept);
+		Long loanNumber = accept.getLoanNumber();
+		System.out.println(loanNumber);
+
+		LoanAmortization amor = new LoanAmortization();
+		amor.setLoanNumber(loanNumber);
+		amor.setTermOfLoan(loanAmortization.getTermOfLoan());
+		amor.setRepaymentStartDate(loanAmortization.getRepaymentStartDate());
+		amor.setInterestRate(loanAmortization.getInterestRate());
+		amor.setLoanClosureDate(loanAmortization.getLoanClosureDate());
+		amor.setMonthlyPaymentAmount(loanAmortization.getMonthlyPaymentAmount());
+
+		lmRepo.save(amor);
+		
+		Long loanId = loanStatus.getLoan().getLoanId();
+		lsr.updateLoanStatus("Accepted", loanId);
+		
+		return loanNumber;
+	}
+
+
+	@Override
+	@Transactional
+	public void rejectLoan(Long loanId) {
+		System.out.println("Rejecting application with Loan Id: " + loanId);
+		lsr.updateLoanStatus("Reject", loanId);
+		
+	}
+	
+	public void findLoanById(Loan loanNumber) {
+		laRepo.findById(LoanNumber);
+	}
+
+}

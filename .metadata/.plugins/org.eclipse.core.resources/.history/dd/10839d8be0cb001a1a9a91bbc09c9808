@@ -1,0 +1,102 @@
+package com.elaon.service;
+
+import java.util.Date;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import com.elaon.dao.BorrowerRepository;
+import com.elaon.dao.LoanRepository;
+import com.elaon.dao.LoanStatusRepository;
+import com.elaon.entity.Borrower;
+import com.elaon.entity.Loan;
+import com.elaon.entity.LoanStatus;
+import com.elaon.entity.Property;
+import com.elaon.model.LoanBorrower;
+import com.elaon.model.LoanDetails;
+import com.elaon.model.PropertyDetails;
+
+@Service
+public class NewLoanServiceImpl implements NewLoanService {
+
+	@Autowired
+	BorrowerRepository br;
+	
+	@Autowired
+	LoanRepository loanRepo;
+	
+	@Autowired
+	LoanStatusRepository loanStatusRepo;
+	
+	
+	public void getBorrower(LoanBorrower loanBorrower) {
+		
+		String name = loanBorrower.getbName();
+		String bStructure = loanBorrower.getbStructure();
+		String bIndicator = loanBorrower.getbIndicator();
+		String tIndicator = loanBorrower.gettIndicator();
+		String address = loanBorrower.getbAddress();
+		String cNo = loanBorrower.getbContactNo();
+		String email = loanBorrower.getbEmail();
+
+		System.out.println();
+		System.out.println(name + " " + bStructure + " " + bIndicator + " " + tIndicator);
+		System.out.println();
+		System.out.println(address + " " + cNo + " " + email);
+
+		Borrower b = new Borrower();
+
+		b.setName(name);
+		b.setBusinessStructure(bStructure);
+		b.setBillingIndicator(bIndicator);
+		b.setTaxIndicator(tIndicator);
+		b.setBorrowerAddress(address);
+		b.setBorrowerContactNo(cNo);
+		b.setBorrowerEmail(email);
+
+		br.save(b);
+		
+	}
+
+	@Override
+	public Long save(LoanBorrower loanBorrower, PropertyDetails propertyDetails, LoanDetails loanDetails) {
+		
+		Borrower borrower = new Borrower();
+		borrower.setName(loanBorrower.getbName());
+		borrower.setBusinessStructure( loanBorrower.getbStructure());
+		borrower.setBillingIndicator(loanBorrower.getbIndicator());
+		borrower.setTaxIndicator(loanBorrower.gettIndicator());
+		borrower.setBorrowerAddress(loanBorrower.getbAddress());
+		borrower.setBorrowerContactNo(loanBorrower.getbContactNo());
+		borrower.setBorrowerEmail(loanBorrower.getbEmail());
+		
+		
+		Property property = new Property();
+		property.setAcresOfLand(propertyDetails.getAcresLand());
+		property.setLandValue(propertyDetails.getLandValue());
+		property.setProducedOnLand(propertyDetails.getProdOnLand());
+		property.setAppraisedBy(propertyDetails.getAppraisedBy());
+		Date date = propertyDetails.getValDate();
+		property.setValuationDate(date);
+		property.setFieldRepresentative(propertyDetails.getFieldRepresentative());
+		property.setCountry(propertyDetails.getCountry());
+		property.setState(propertyDetails.getState());
+		
+		Loan loan = new Loan();
+		loan.setLoanType(loanDetails.getLoanType());
+		loan.setLoanAmount(loanDetails.getAmtRequested());
+		loan.setLoanDate(loanDetails.getApplicationDate());
+		loan.setBorrower(borrower);
+		loan.setProperty(property);
+		
+		LoanStatus loanStatus = new LoanStatus();
+		loanStatus.setApprovalStatus("Pending");
+		loanStatus.setLoan(loan);
+		
+		loanStatusRepo.save(loanStatus);
+		Long id = loanStatus.getStatusId();
+		return id;
+	}
+
+	
+}

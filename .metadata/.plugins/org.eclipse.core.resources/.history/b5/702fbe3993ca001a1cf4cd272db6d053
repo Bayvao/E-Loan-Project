@@ -1,0 +1,146 @@
+<%@ taglib prefix="form" uri="http://www.springframework.org/tags/form"%>
+<%@ taglib prefix="security"
+	uri="http://www.springframework.org/security/tags"%>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="ISO-8859-1">
+<title>Property Details Form</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link
+	href="http://code.jquery.com/ui/1.10.4/themes/ui-lightness/jquery-ui.css"
+	rel="stylesheet">
+<script src="http://code.jquery.com/jquery-1.10.2.js"></script>
+<script src="http://code.jquery.com/ui/1.10.4/jquery-ui.js"></script>
+<link rel="stylesheet"
+	href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css">
+<script
+	src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+<script
+	src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js"></script>
+<style>
+.error {
+	color: red;
+}
+</style>
+<script>
+	$(function() {
+		$('#datepicker').datepicker({
+			maxDate : 0
+		});
+	});
+</script>
+
+</head>
+<body>
+	<div class="container">
+		<br />
+
+		<!-- Add a logout button -->
+		<form:form action="${pageContext.request.contextPath}/logout"
+			method="POST">
+
+			<input type="submit" value="Logout" />
+
+		</form:form>
+		<br /> <br />
+
+		<p>
+
+			<security:authorize access="isAuthenticated()">  
+        User: <security:authentication property="principal.username" />
+        Role(s): <security:authentication
+					property="principal.authorities" />
+			</security:authorize>
+		</p>
+
+
+		<hr>
+		<h2>Property Details</h2>
+
+		<form:form
+			action="${pageContext.request.contextPath}/loan/processProperty"
+			modelAttribute="propDetails">
+			<div class="form-group row">
+				<label class="col-sm-2 col-form-label">Acres Of Land:</label>
+				<div class="col-sm-10">
+					<form:input path="acresLand" placeholder="Acres Of Land"
+						type="number" class="form-control" />
+					<form:errors path="acresLand" cssClass="error" />
+				</div>
+			</div>
+
+			<div class="form-group row">
+				<label class="col-sm-2 col-form-label">Value Of Land:</label>
+				<div class="col-sm-10">
+					<form:input path="landValue" placeholder="land Value"
+						class="form-control" />
+					<form:errors path="landValue" cssClass="error" />
+				</div>
+			</div>
+
+			<div class="form-group row">
+				<label class="col-sm-2 col-form-label">Production Of Land:</label>
+				<div class="col-sm-10">
+					<form:input path="prodOnLand" placeholder="Produced On Land"
+						class="form-control" />
+					<form:errors path="prodOnLand" cssClass="error" />
+				</div>
+			</div>
+
+			<div class="form-group row">
+				<label class="col-sm-2 col-form-label">Appraised By:</label>
+				<div class="col-sm-10">
+					<form:input path="appraisedBy" placeholder="Appraised By"
+						class="form-control" />
+					<form:errors path="appraisedBy" cssClass="error" />
+				</div>
+			</div>
+
+			<div class="form-group row">
+				<label class="col-sm-2 col-form-label">Valuation Date:</label>
+				<div class="col-sm-10">
+					<form:input path="valDate" placeholder="valuation Date"
+						id="datepicker" />
+					<form:errors path="valDate" cssClass="error" />
+				</div>
+			</div>
+
+			<div class="form-group row">
+				<label class="col-sm-2 col-form-label">Field Representative:</label>
+				<div class="col-sm-10">
+					<form:input path="fieldRepresentative"
+						placeholder="Field Representative" class="form-control" />
+					<form:errors path="fieldRepresentative" cssClass="error" />
+				</div>
+			</div>
+
+			<div class="form-group row">
+				<label class="col-sm-2 col-form-label">Property Country:</label>
+				<div class="col-sm-10">
+					<form:input path="country" placeholder="Property Country"
+						class="form-control" />
+					<form:errors path="country" cssClass="error" />
+				</div>
+			</div>
+
+			<div class="form-group row">
+				<label class="col-sm-2 col-form-label">Property State:</label>
+				<div class="col-sm-10">
+					<form:input path="state" placeholder="Property State"
+						class="form-control" />
+					<form:errors path="state" cssClass="error" />
+				</div>
+			</div>
+
+			<div class="form-group row">
+				<div class="col-sm-10">
+					<button type="submit" class="btn btn-primary">Next</button>
+				</div>
+			</div>
+		</form:form>
+	</div>
+</body>
+</html>

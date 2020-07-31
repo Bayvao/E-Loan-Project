@@ -1,0 +1,26 @@
+package com.elaon.entity;
+
+import java.util.Date;
+
+import javax.persistence.Column;
+import javax.persistence.Entity;
+import javax.persistence.Id;
+import javax.persistence.Table;
+
+@Entity
+@Table(name = "loan_payment" )
+public class LoanPayment {
+
+	@Id
+	@Column(name = "loan_number")
+	private Long loanNumber;
+	@Column(name = "amount_repaid")
+	private Double amountPaid;
+	@Column(name = "mode_of_Payment")
+	private String modeOfPayment;
+	@Column(name = "cheque_or_draft_number")
+	private Long chequeOrDraftNumber;
+	@Column(name = "date_and_time_of_payment")
+	private Date dateOfPayment;
+	
+}

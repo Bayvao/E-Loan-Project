@@ -1,0 +1,86 @@
+<%@ taglib prefix="form" uri="http://www.springframework.org/tags/form"%>
+<%@ taglib prefix="security"
+	uri="http://www.springframework.org/security/tags"%>
+
+<html lang="en">
+
+<head>
+<title>Home Page</title>
+
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet"
+	href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css">
+<script
+	src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+<script
+	src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js"></script>
+</head>
+
+<body>
+
+<div class="container">
+		<br />
+
+	<form:form action="${pageContext.request.contextPath}/logout"
+		method="POST">
+
+		<input type="submit" value="Logout" />
+
+	</form:form>
+
+	<br />
+
+	<!-- display user name and role -->
+
+	<p>
+
+		<security:authorize access="isAuthenticated()">  
+        User: <security:authentication property="principal.username" />
+        Role(s): <security:authentication
+				property="principal.authorities" />
+		</security:authorize>
+
+	</p>
+	<hr/>
+	<p>
+		<a href="${pageContext.request.contextPath}/loan/showNewCustomerForm">New
+			Loan</a>
+	</p>
+
+	<p>
+		<a href="${pageContext.request.contextPath}/pay/loanPaymentPage">Loan
+			Payment</a>
+	</p>
+
+	<security:authorize access="hasRole('MANAGER')">
+
+		<!-- Add a link to point to /leaders ... this is for the managers -->
+
+		<p>
+			<a
+				href="${pageContext.request.contextPath}/editForm/showEditFormPage">Edit
+				Form</a>
+		</p>
+
+		<p>
+			<a href="${pageContext.request.contextPath}/showManagerPage">Go
+				To Manager Home Page</a> (Only for Manager)
+		</p>
+
+	</security:authorize>
+
+</div>
+
+</body>
+
+</html>
+
+
+
+
+
+
+
+
+

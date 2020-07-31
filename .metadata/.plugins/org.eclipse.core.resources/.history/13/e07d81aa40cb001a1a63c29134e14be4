@@ -1,0 +1,13 @@
+package com.elaon.entity;
+
+import java.util.Date;
+
+public class LoanPayment {
+
+	private Long loanNumber;
+	private Double amountPaid;
+	private String modeOfPayment;
+	private Long chequeOrDraftNumber;
+	private Date dateOfPayment;
+	
+}

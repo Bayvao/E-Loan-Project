@@ -1,0 +1,53 @@
+package com.elaon.model;
+
+import java.util.Date;
+
+public class Payment {
+
+	private Long loanNumber;
+	private Double amountPaid;
+	private String modeOfPayment;
+	private Long chequeOrDraftNumber;
+	private Date dateOfPayment;
+
+	public Long getLoanNumber() {
+		return loanNumber;
+	}
+
+	public void setLoanNumber(Long loanNumber) {
+		this.loanNumber = loanNumber;
+	}
+
+	public Double getAmountPaid() {
+		return amountPaid;
+	}
+
+	public void setAmountPaid(Double amountPaid) {
+		this.amountPaid = amountPaid;
+	}
+
+	public String getModeOfPayment() {
+		return modeOfPayment;
+	}
+
+	public void setModeOfPayment(String modeOfPayment) {
+		this.modeOfPayment = modeOfPayment;
+	}
+
+	public Long getChequeOrDraftNumber() {
+		return chequeOrDraftNumber;
+	}
+
+	public void setChequeOrDraftNumber(Long chequeOrDraftNumber) {
+		this.chequeOrDraftNumber = chequeOrDraftNumber;
+	}
+
+	public Date getDateOfPayment() {
+		return dateOfPayment;
+	}
+
+	public void setDateOfPayment(Date dateOfPayment) {
+		this.dateOfPayment = dateOfPayment;
+	}
+
+}

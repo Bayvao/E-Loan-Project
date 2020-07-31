@@ -1,0 +1,63 @@
+package com.elaon.controller;
+
+import java.util.List;
+
+import javax.servlet.http.HttpSession;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+
+import com.elaon.dao.LoanStatusRepository;
+import com.elaon.entity.LoanStatus;
+
+@Controller
+@RequestMapping("/manager")
+public class ManagerController {
+
+	@Autowired
+	LoanStatusRepository lsRepo;
+
+	@GetMapping("/seePendingList")
+	public String pendingLoanApprovalList(Model model) {
+
+		List<LoanStatus> listLoan = lsRepo.getLoanStatusByApprovalStatus("No");
+
+		model.addAttribute("listPendingLoan", listLoan);
+
+		return "pending-loan-approval";
+	}
+
+	@GetMapping("/detailView")
+	public String showDetailedLoanApplication(@RequestParam String id, Model model, HttpSession session) {
+
+		Long statusId = Long.parseLong(id);
+		LoanStatus ls = (LoanStatus) lsRepo.findById(statusId).get();
+		
+		System.out.println();
+		System.out.println("Detailed View");
+		System.out.println();
+		System.out.println(ls);
+		System.out.println();
+		
+		session.setAttribute("ls", ls);
+		
+		model.addAttribute("loanDetails", ls);
+		
+		return "detailed-loan-application";
+
+	}
+	
+	@GetMapping("/approveLoan")
+	public String approvePendingLoan(HttpSession session) {
+		
+		LoanStatus loanStatus = (LoanStatus) session.getAttribute("ls");
+		System.out.println(loanStatus);
+		
+		return "redirect:/seePendingList";
+	}
+}

@@ -1,0 +1,16 @@
+package com.elaon.service;
+
+import java.util.List;
+
+import com.elaon.entity.LoanPayment;
+import com.elaon.model.Payment;
+
+public interface LoanPaymentService {
+
+	public void addPayment(Payment payment);
+	
+	public boolean loanNumberExist(Long loanNumber);
+	
+	List<LoanPayment> findPaymentByLoanNumber(Long loanNumber);
+
+}

@@ -1,0 +1,8 @@
+package com.elaon.entity;
+
+import javax.persistence.Embeddable;
+
+@Embeddable
+public class DateOfPayment {
+
+}

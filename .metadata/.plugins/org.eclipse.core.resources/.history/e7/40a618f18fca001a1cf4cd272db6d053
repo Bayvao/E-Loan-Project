@@ -1,0 +1,146 @@
+<%@ page language="java" contentType="text/html; charset=ISO-8859-1"
+	pageEncoding="ISO-8859-1"%>
+<%@ taglib prefix="form" uri="http://www.springframework.org/tags/form"%>
+<%@ taglib prefix="security"
+	uri="http://www.springframework.org/security/tags"%>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="ISO-8859-1">
+<title>Loan Amortization</title>
+<link rel="stylesheet"
+	href="http://code.jquery.com/ui/1.10.2/themes/smoothness/jquery-ui.css" />
+<script src="http://code.jquery.com/jquery-1.9.1.js"></script>
+<script src="http://code.jquery.com/ui/1.10.2/jquery-ui.js"></script>
+
+<style>
+.error {
+	color: red;
+}
+</style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet"
+	href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css">
+<script
+	src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+<script
+	src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js"></script>
+<script>
+	$(function() {
+		$('#datepicker').datepicker();
+	});
+</script>
+</head>
+<body>
+ <div class="container">
+	<!-- Add a logout button -->
+	<form:form action="${pageContext.request.contextPath}/logout"
+		method="POST">
+
+		<input type="submit" value="Logout" />
+
+	</form:form>
+
+	<hr>
+
+	<!-- display user name and role -->
+
+	<p>
+
+		<security:authorize access="isAuthenticated()">  
+        User: <security:authentication property="principal.username" />
+        Role(s): <security:authentication
+				property="principal.authorities" />
+		</security:authorize>
+	<p>
+	<hr />
+
+	<h2>Loan Amortization</h2>
+
+	<form:form
+		action="${pageContext.request.contextPath}/manager/processLoanAmortization"
+		modelAttribute="loanAmor" method="POST">
+
+		<br>
+		<div class="form-group row">
+			<label>Term Of Loan:</label>
+			<form:input path="termOfLoan" placeholder="Term Of Loan(In Months)"
+				id="termOfLoan" />
+		</div>
+		<br>
+		<div class="form-group row">
+			<label>Payment Start Date:</label>
+			<form:input type="date" path="repaymentStartDate"
+				placeholder="Payment Start Date" id="startDate" class="form-control"
+				oninput="myFunction()" />
+			<form:errors path="repaymentStartDate" cssClass="error" />
+		</div>
+		<br>
+		<div class="form-group row">
+			<label>Loan Closure Date:</label>
+			<form:input type="date" path="loanClosureDate"
+				placeholder="Loan Closure Date" id="closureDate"
+				class="form-control" readonly="true" />
+			<form:errors path="loanClosureDate" cssClass="error" />
+		</div>
+		<br>
+		<div class="form-group row">
+			<label>Interest Rate:</label>
+			<form:input path="interestRate" placeholder="Interest Rate"
+				id="interestRate" class="form-control" oninput="myPayment()" />
+		</div>
+		<br>
+		<div class="form-group row">
+			<label>Monthly Payment Amount:</label>
+			<form:input path="monthlyPaymentAmount"
+				placeholder="Monthly Payment Amount" class="form-control"
+				id="monthlyPaymentAmount" readonly="true" />
+		</div>
+		<input type="hidden" value="${loanAmt}" id="loanAmt" />
+		<br>
+		<div class="form-group row">
+		<div class="col-sm-10">
+			<button type="submit" class="btn btn-primary">Submit</button>
+		</div>
+		</div>
+	</form:form>
+</div>
+	<script>
+		function myFunction() {
+			var x = document.getElementById("termOfLoan").value;
+			var y = document.getElementById("startDate").value;
+			var months = parseInt(x);
+			var date = new Date(y);
+			date.setMonth(date.getMonth() + months + 1);
+			if (date.getDate() < 10) {
+				var d = "0" + date.getDate();
+			}else{
+				var d = date.getDate();
+			}
+
+			if (date.getMonth() < 10) {
+				var m = "0" + date.getMonth();
+			}else{
+				var m = date.getMonth();
+			}
+
+			document.getElementById("closureDate").value = date.getFullYear()
+					+ "-" + m + "-" + d;
+
+		}
+
+		function myPayment() {
+			var princ = document.getElementById("loanAmt").value;
+			var intr = document.getElementById("interestRate").value/1200;
+			var term = document.getElementById("termOfLoan").value;
+			var emi = princ * intr / (1 - (Math.pow(1/(1 + intr), term)));
+			var monthlyPaymentAmount = emi.toFixed(2);
+			document.getElementById("monthlyPaymentAmount").value = monthlyPaymentAmount;
+		}
+		
+	</script>
+
+</body>
+</html>

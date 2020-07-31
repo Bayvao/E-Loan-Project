@@ -1,0 +1,126 @@
+<%@ taglib prefix="form" uri="http://www.springframework.org/tags/form"%>
+<%@ taglib prefix="security"
+	uri="http://www.springframework.org/security/tags"%>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="ISO-8859-1">
+<title>Property Details Form</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link
+	href="http://code.jquery.com/ui/1.10.4/themes/ui-lightness/jquery-ui.css"
+	rel="stylesheet">
+<script src="http://code.jquery.com/jquery-1.10.2.js"></script>
+<script src="http://code.jquery.com/ui/1.10.4/jquery-ui.js"></script>
+<link rel="stylesheet"
+	href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css">
+<script
+	src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+<script
+	src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js"></script>
+<style>
+.error {
+	color: red;
+}
+</style>
+<script>
+$(function(){
+    $('#datepicker').datepicker({
+    	maxDate: 0
+    });
+});
+</script>
+
+</head>
+<body>
+
+	<!-- Add a logout button -->
+	<form:form action="${pageContext.request.contextPath}/logout"
+		method="POST">
+
+		<input type="submit" value="Logout" />
+
+	</form:form>
+
+
+	<p>
+
+		<security:authorize access="isAuthenticated()">  
+        User: <security:authentication property="principal.username" />
+        Role(s): <security:authentication
+				property="principal.authorities" />
+		</security:authorize>
+	</p>
+
+
+	<hr>
+
+	<form:form
+		action="${pageContext.request.contextPath}/loan/processProperty"
+		modelAttribute="propDetails">
+		<div>
+			<label>Acres Of Land:</label>
+			<form:input path="acresLand" placeholder="Acres Of Land"
+				type="number" class="form-control" />
+			<form:errors path="acresLand" cssClass="error" />
+		</div>
+		<br>
+		<div>
+			<label>Value Of Land:</label>
+			<form:input path="landValue" placeholder="land Value"
+				class="form-control" />
+			<form:errors path="landValue" cssClass="error" />
+		</div>
+		<br>
+		<div>
+			<label>Production Of Land:</label>
+			<form:input path="prodOnLand" placeholder="Produced On Land"
+				class="form-control" />
+			<form:errors path="prodOnLand" cssClass="error" />
+		</div>
+		<br>
+		<div>
+			<label>Appraised By:</label>
+			<form:input path="appraisedBy" placeholder="Appraised By"
+				class="form-control" />
+			<form:errors path="appraisedBy" cssClass="error" />
+		</div>
+		<br>
+		<div>
+			<label>Valuation Date:</label>
+			<form:input path="valDate" placeholder="valuation Date"
+				id="datepicker" />
+			<form:errors path="valDate" cssClass="error" />
+		</div>
+		<br>
+		<div>
+			<label>Field Representative:</label>
+			<form:input path="fieldRepresentative"
+				placeholder="Field Representative" class="form-control" />
+			<form:errors path="fieldRepresentative" cssClass="error" />
+		</div>
+		<br>
+		<div>
+			<label>Property Country:</label>
+			<form:input path="country" placeholder="Property Country"
+				class="form-control" />
+			<form:errors path="country" cssClass="error" />
+		</div>
+		<br>
+		<div>
+			<label>Property State:</label>
+			<form:input path="state" placeholder="Property State"
+				class="form-control" />
+			<form:errors path="state" cssClass="error" />
+		</div>
+		<br>
+
+		<div>
+			<button type="submit" class="btn btn-blue text-center">Next</button>
+		</div>
+	</form:form>
+
+</body>
+</html>

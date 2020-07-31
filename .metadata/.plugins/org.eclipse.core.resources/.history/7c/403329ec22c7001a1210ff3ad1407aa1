@@ -1,0 +1,133 @@
+<%@ page language="java" contentType="text/html; charset=ISO-8859-1"
+	pageEncoding="ISO-8859-1"%>
+<%@ taglib prefix="form" uri="http://www.springframework.org/tags/form"%>
+<%@ taglib prefix="security"
+	uri="http://www.springframework.org/security/tags"%>
+<%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core"%>
+
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="ISO-8859-1">
+<title>Insert title here</title>
+</head>
+<body>
+
+	<!-- Add a logout button -->
+	<form:form action="${pageContext.request.contextPath}/logout"
+		method="POST">
+
+		<input type="submit" value="Logout" />
+
+	</form:form>
+	<br>
+	<hr>
+
+	<!-- display user name and role -->
+
+	<p>
+
+		<security:authorize access="isAuthenticated()">  
+        User: <security:authentication property="principal.username" />
+        Role(s): <security:authentication
+				property="principal.authorities" />
+		</security:authorize>
+
+		<%-- <table border=1>
+		<tr>
+			<th>Loan ID</th>
+			<th>Loan Type</th>
+			<th>Loan Amount</th>
+			<th>Loan Date</th>
+			<th>Loan Status</th>
+		</tr>
+		
+			<tr>
+				<td>${loanDetails.loan.loanId}</td>
+				<td>${loanDetails.loan.loanType}</td>
+				<td>${loanDetails.loan.loanAmount}</td>
+				<td>${loanDetails.loan.loanDate}</td>
+				<td>${loanDetails.approvalStatus}</td>
+			</tr>
+		
+	</table> --%>
+		<br>
+	<hr>
+	<br>
+	<center>
+		<h2>Form Details</h2>
+	</center>
+	<br>
+	<br>
+	<br>
+
+
+	<form:form modelAttribute="loanDetails">
+	Loan Application Number:<input type="text" value="${loanDetails.loan.loanId}" readonly>
+	Loan Type:<input type="text" value="${loanDetails.loan.loanType}"
+			readonly>
+	Loan Amount:<input type="text" value="${loanDetails.loan.loanAmount}"
+			readonly>
+	Loan Application Date:<input type="text"
+			value="${loanDetails.loan.loanDate}" readonly>
+	Loan Approval Status:<input type="text"
+			value="${loanDetails.approvalStatus}" readonly>
+		<br>
+		<br>
+		<br>
+	
+	Borrower Name:<input type="text"
+			value="${loanDetails.loan.borrower.name}" readonly>
+	Business Structure:<input type="text"
+			value="${loanDetails.loan.borrower.businessStructure}" readonly>
+	Billing Indicator:<input type="text"
+			value="${loanDetails.loan.borrower.billingIndicator}" readonly>
+	Tax Indicator:<input type="text"
+			value="${loanDetails.loan.borrower.taxIndicator}" readonly>
+	Address:<input type="text"
+			value="${loanDetails.loan.borrower.borrowerAddress}" readonly>
+		<br>
+		<br>
+		<br>
+	
+	Contact No.:<input type="text"
+			value="${loanDetails.loan.borrower.borrowerContactNo}" readonly>
+	Email:<input type="text"
+			value="${loanDetails.loan.borrower.borrowerEmail}" readonly>
+		<br>
+		<br>
+		<br>
+	
+	Acres Of Land:<input type="text"
+			value="${loanDetails.loan.property.acresOfLand}" readonly>
+	Land Value:<input type="text"
+			value="${loanDetails.loan.property.landValue}" readonly>
+	Production On Land:<input type="text"
+			value="${loanDetails.loan.property.producedOnLand}" readonly>
+	Appraised By:<input type="text"
+			value="${loanDetails.loan.property.appraisedBy}" readonly>
+	Land Valuation Date:<input type="text"
+			value="${loanDetails.loan.property.valuationDate}" readonly>
+		<br>
+		<br>
+		<br>
+	
+	Field Representative:<input type="text"
+			value="${loanDetails.loan.property.fieldRepresentative}" readonly>
+	Country:<input type="text" value="${loanDetails.loan.property.country}"
+			readonly>
+	State:<input type="text" value="${loanDetails.loan.property.state}"
+			readonly>
+		<br>
+		<br>
+		<br>
+		<p>
+			<a href="${pageContext.request.contextPath}/manager/seePendingList">Go Back</a>
+		</p>
+
+	</form:form>
+
+
+
+</body>
+</html>

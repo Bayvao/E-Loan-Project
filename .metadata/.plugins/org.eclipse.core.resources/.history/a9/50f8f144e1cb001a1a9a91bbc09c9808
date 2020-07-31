@@ -1,0 +1,113 @@
+package com.elaon.entity;
+
+import java.util.Date;
+
+import javax.persistence.CascadeType;
+import javax.persistence.Column;
+import javax.persistence.Entity;
+import javax.persistence.FetchType;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
+import javax.persistence.JoinColumn;
+import javax.persistence.OneToOne;
+import javax.persistence.Table;
+import javax.persistence.Temporal;
+import javax.persistence.TemporalType;
+
+import org.springframework.format.annotation.DateTimeFormat;
+
+@Entity
+@Table(name = "loan")
+public class Loan {
+
+	@Id
+	@GeneratedValue(strategy = GenerationType.IDENTITY)
+	@Column(name = "loan_id")
+	private Long loanId;
+
+	@Column(name = "loan_type")
+	private String loanType;
+
+	@Column(name = "loan_amount")
+	private Long loanAmount;
+
+	@Column(name = "loan_date")
+	@Temporal(TemporalType.DATE)
+	@DateTimeFormat(pattern = "dd-mm-yyyy")
+	private Date loanDate;
+
+	@OneToOne(cascade = CascadeType.ALL, fetch = FetchType.EAGER)
+	@JoinColumn(name = "property_id")
+	private Property property;
+
+	@OneToOne(cascade = CascadeType.ALL, fetch = FetchType.EAGER)
+	@JoinColumn(name = "borrower_id")
+	private Borrower borrower;
+
+	@OneToOne(mappedBy = "loan")
+	private LoanStatus loanStatus;
+
+	public Long getLoanId() {
+		return loanId;
+	}
+
+	public void setLoanId(Long loanId) {
+		this.loanId = loanId;
+	}
+
+	public String getLoanType() {
+		return loanType;
+	}
+
+	public void setLoanType(String loanType) {
+		this.loanType = loanType;
+	}
+
+	public Long getLoanAmount() {
+		return loanAmount;
+	}
+
+	public void setLoanAmount(Long loanAmount) {
+		this.loanAmount = loanAmount;
+	}
+
+	public Date getLoanDate() {
+		return loanDate;
+	}
+
+	public void setLoanDate(Date loanDate) {
+		this.loanDate = loanDate;
+	}
+
+	public Property getProperty() {
+		return property;
+	}
+
+	public void setProperty(Property property) {
+		this.property = property;
+	}
+
+	public Borrower getBorrower() {
+		return borrower;
+	}
+
+	public void setBorrower(Borrower borrower) {
+		this.borrower = borrower;
+	}
+
+	public LoanStatus getLoanStatus() {
+		return loanStatus;
+	}
+
+	public void setLoanStatus(LoanStatus loanStatus) {
+		this.loanStatus = loanStatus;
+	}
+
+	@Override
+	public String toString() {
+		return "Loan [loanId=" + loanId + ", loanType=" + loanType + ", loanAmount=" + loanAmount + ", loanDate="
+				+ loanDate + ", property=" + property + ", borrower=" + borrower + "]";
+	}
+
+}

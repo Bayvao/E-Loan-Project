@@ -1,0 +1,67 @@
+<%@ taglib prefix="form" uri="http://www.springframework.org/tags/form" %>
+<%@ taglib prefix="security" uri="http://www.springframework.org/security/tags" %>
+
+<html lang="en">
+
+<head>
+	<title>Home Page</title>
+</head>
+
+<body>
+	
+		<!-- Add a logout button -->
+	<form:form action="${pageContext.request.contextPath}/logout" 
+			   method="POST">
+	
+		<input type="submit" value="Logout" />
+	
+	</form:form>
+	
+	<hr>
+	
+	<!-- display user name and role -->
+	
+	<p>
+	
+	<security:authorize access="isAuthenticated()">  
+        User: <security:authentication property="principal.username" />
+        Role(s): <security:authentication property="principal.authorities" />
+    </security:authorize>
+    
+	</p>
+	
+	<p>
+			<a href="${pageContext.request.contextPath}/loan/showNewCustomerForm">New Loan</a>
+			(Only for Manager peeps)
+	</p>
+	
+	<security:authorize access="hasRole('MANAGER')">
+	
+		<!-- Add a link to point to /leaders ... this is for the managers -->
+		
+		<p>
+			<a href="${pageContext.request.contextPath}/editForm/showEditFormPage">Edit Form</a>
+			(Only for Manager)
+		</p>
+		
+		<p>
+			<a href="${pageContext.request.contextPath}/showManagerPage">Go To Manager Home Page</a>
+			(Only for Manager)
+		</p>
+
+	</security:authorize>		
+	
+	
+	
+</body>
+
+</html>
+
+
+
+
+
+
+
+
+

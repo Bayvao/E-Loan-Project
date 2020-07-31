@@ -1,0 +1,79 @@
+<%@ page language="java" contentType="text/html; charset=ISO-8859-1"
+    pageEncoding="ISO-8859-1"%>
+<%@ taglib prefix="form" uri="http://www.springframework.org/tags/form" %>
+<%@ taglib prefix="security" uri="http://www.springframework.org/security/tags" %>
+
+<!DOCTYPE html>
+<html>
+<head>
+<title>Loan Acceptance</title>
+<style>
+.error {
+	color: red;
+}
+</style>
+
+</head>
+<body>
+
+<!-- Add a logout button -->
+	<form:form action="${pageContext.request.contextPath}/logout" 
+			   method="POST">
+	
+		<input type="submit" value="Logout" />
+	
+	</form:form>
+	
+	<hr>
+	
+	<!-- display user name and role -->
+	
+	<p>
+	
+	<security:authorize access="isAuthenticated()">  
+        User: <security:authentication property="principal.username" />
+        Role(s): <security:authentication property="principal.authorities" />
+    </security:authorize>
+    
+    <p>
+    <hr/>
+    
+    <h2>Loan Acceptance Form:</h2>
+    
+   <form:form
+		action="${pageContext.request.contextPath}/manager/processLoanAcceptance"
+		modelAttribute="lAcc">
+		<div>
+			<label>Regional Office:</label>
+			<form:input path="regOffice" placeholder="Regional Office"
+				class="form-control" />
+			<form:errors path="regOffice" cssClass="error" />
+		</div>
+		<br>
+		<div>
+			<label>Sanctioning Date:</label>
+			<form:input path="sancDate" value = "${d}" placeholder="Sanctioned Date"
+				id="sandate" readonly="true"/>
+		</div>
+		<br>
+		<div>
+			<label>Sanctioning Official:</label>
+			<form:input path="sancOffical" placeholder="Sanctioning Offical(User name)"
+				class="form-control" />
+			<form:errors path="sancOffical" cssClass="error" />
+		</div>
+		<br>
+		<div>
+			<label>Loan Id:</label>
+			<form:input path="loanId" value="${loanStatus.loan.loanId}" placeholder="Loan Id"
+				class="form-control" readonly="true"/>
+		</div>
+		<br>
+		<div>
+			<button type="submit" class="btn btn-blue text-center">Submit</button>
+		</div>
+	</form:form>
+
+
+</body>
+</html>

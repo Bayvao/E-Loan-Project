@@ -1,0 +1,6 @@
+package com.elaon.service;
+
+public interface SmsSender {
+
+	void sendSms(SmsRequest smsRequest);
+}

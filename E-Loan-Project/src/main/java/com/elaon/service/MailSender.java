@@ -1,0 +1,8 @@
+package com.elaon.service;
+
+import com.elaon.model.SmsRequest;
+
+public interface MailSender {
+
+	void sendMail(SmsRequest smsRequest, String subject);
+}

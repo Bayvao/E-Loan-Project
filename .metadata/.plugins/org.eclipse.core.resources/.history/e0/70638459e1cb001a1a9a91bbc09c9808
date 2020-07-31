@@ -1,0 +1,46 @@
+package com.elaon.model;
+
+import java.util.Date;
+
+import javax.validation.constraints.Min;
+import javax.validation.constraints.NotNull;
+import javax.validation.constraints.Size;
+
+public class LoanDetails {
+
+	@NotNull(message = "is required")
+	@Size(min = 1, message = "is required")
+	private String loanType;
+
+	@NotNull(message = "is required")
+	@Min(value = 100, message = "must be greater than zero")
+	private Long amtRequested;
+
+	@NotNull(message = "is required")
+	private String applicationDate;
+
+	public String getLoanType() {
+		return loanType;
+	}
+
+	public void setLoanType(String loanType) {
+		this.loanType = loanType;
+	}
+
+	public Long getAmtRequested() {
+		return amtRequested;
+	}
+
+	public void setAmtRequested(Long amtRequested) {
+		this.amtRequested = amtRequested;
+	}
+
+	public String getApplicationDate() {
+		return applicationDate;
+	}
+
+	public void setApplicationDate(String applicationDate) {
+		this.applicationDate = applicationDate;
+	}
+
+}

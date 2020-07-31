@@ -1,0 +1,12 @@
+package com.elaon.dao;
+
+import java.util.List;
+
+import org.springframework.data.repository.CrudRepository;
+
+import com.elaon.entity.LoanAmortization;
+
+public interface LoanAmortizationRepository extends CrudRepository<LoanAmortization, Long> {
+
+	List<LoanAmortization> findByLoanNumberContaining(Long loanNumber);
+}

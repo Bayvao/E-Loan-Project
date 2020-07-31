@@ -1,0 +1,13 @@
+package com.elaon.dao;
+
+import java.util.List;
+
+import org.springframework.data.repository.CrudRepository;
+
+import com.elaon.entity.LoanAcceptance;
+
+public interface LoanAcceptanceRepository extends CrudRepository<LoanAcceptance, Long> {
+
+	List<LoanAcceptance> findAllById(Long loanNumber);
+
+}

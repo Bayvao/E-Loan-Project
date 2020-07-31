@@ -1,0 +1,18 @@
+<%@ page language="java" contentType="text/html; charset=ISO-8859-1"
+	pageEncoding="ISO-8859-1"%>
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="ISO-8859-1">
+<title>Loan Confirmation</title>
+</head>
+<body>
+	<div>
+		<h1>Congratulation! Loan has been Accepted with Loan Number ${loanNumber}</h1>
+	</div>
+
+	<div>
+		<a href="${pageContext.request.contextPath}/">Back to Home Page</a>
+	</div>
+</body>
+</html>

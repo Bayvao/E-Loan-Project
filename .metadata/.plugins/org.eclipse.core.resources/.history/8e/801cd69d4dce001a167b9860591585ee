@@ -1,0 +1,643 @@
+package com.elaon.controller;
+
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.List;
+import java.util.logging.Logger;
+
+import javax.servlet.http.HttpSession;
+import javax.validation.Valid;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.propertyeditors.StringTrimmerEditor;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.validation.BindingResult;
+import org.springframework.web.bind.WebDataBinder;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.InitBinder;
+import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+
+import com.elaon.dao.LoanStatusRepository;
+import com.elaon.entity.LoanAmortization;
+import com.elaon.entity.LoanStatus;
+import com.elaon.model.AcceptLoan;
+import com.elaon.model.Amortization;
+import com.elaon.model.SmsRequest;
+import com.elaon.service.LoanAcceptanceService;
+import com.elaon.service.MailMessageSender;
+import com.elaon.service.Service;
+
+@Controller
+@RequestMapping("/manager")
+public class ManagerController {
+
+	private final Service smsService;
+
+	@Autowired
+	public ManagerController(Service SmsService) {
+		super();
+		this.smsService = SmsService;
+	}
+
+	@Autowired
+	LoanStatusRepository lsRepo;
+	
+	@Autowired
+	MailMessageSender mailSender;
+
+	@Autowired
+	LoanAcceptanceService loanAcceptService;
+
+	private Logger logger = Logger.getLogger(getClass().getName());
+
+	@InitBinder
+	public void initBinder(WebDataBinder dataBinder) {
+
+		StringTrimmerEditor stringTrimmerEditor = new StringTrimmerEditor(true);
+
+		dataBinder.registerCustomEditor(String.class, stringTrimmerEditor);
+
+	}
+
+	@GetMapping("/seePendingList")
+	public String pendingLoanApprovalList(Model model) {
+
+		List<LoanStatus> listLoan = lsRepo.getLoanStatusByApprovalStatus("Pending");
+		logger.info("Show all Pending Loans");
+
+		model.addAttribute("listPendingLoan", listLoan);
+
+		return "pending-loan-approval";
+	}
+
+	@GetMapping("/detailView")
+	public String showDetailedLoanApplication(@RequestParam String id, Model model, HttpSession session) {
+
+		Long statusId = Long.parseLong(id);
+		LoanStatus ls = (LoanStatus) lsRepo.findById(statusId).get();
+		session.setAttribute("ls", ls);
+
+		System.out.println();
+		System.out.println("Detailed View");
+		System.out.println();
+		System.out.println(ls);
+		System.out.println();
+
+		model.addAttribute("loanDetails", ls);
+		logger.info("Showing detailed of loan application with Status Id = " + statusId + " Loan Id = "
+				+ ls.getLoan().getLoanId());
+
+		return "detailed-loan-application";
+
+	}
+
+	@GetMapping("/approveLoan")
+	public String approvePendingLoan(@RequestParam String id, Model model, HttpSession session) {
+
+		Long statusId = Long.parseLong(id);
+		LoanStatus ls = (LoanStatus) lsRepo.findById(statusId).get();
+		session.setAttribute("ls", ls);
+		System.out.println("In Approve Loan");
+
+		DateFormat df = new SimpleDateFormat("yyyy-MM-dd");
+		Date dateobj = new Date();
+		String d = df.format(dateobj);
+
+		logger.info(
+				"Approved loan application with Status Id = " + statusId + " Loan Id = " + ls.getLoan().getLoanId());
+		logger.info("Showing Loan Acceptance page of loan Id = " + ls.getLoan().getLoanId());
+
+		model.addAttribute("d", d);
+		model.addAttribute("loanStatus", ls);
+		model.addAttribute("lAcc", new AcceptLoan());
+
+		return "loan-acceptance-page";
+	}
+
+	@RequestMapping("/processLoanAcceptance")
+	public String loanAcceptance(@Valid @ModelAttribute("lAcc") AcceptLoan lAcc, BindingResult result, Model model,
+			HttpSession session) {
+
+		if (result.hasErrors()) {
+
+			return "loan-acceptance-page";
+		}
+		System.out.println("In process Loan Acceptance");
+		LoanStatus ls = (LoanStatus) session.getAttribute("ls");
+		Long amt = ls.getLoan().getLoanAmount();
+		System.out.println(lAcc.getRegOffice());
+		session.setAttribute("ac", lAcc);
+		model.addAttribute("loanAmt", amt);
+		model.addAttribute("loanAmor", new Amortization());
+		return "loan-amortization";
+
+	}
+
+	@PostMapping("/processLoanAmortization")
+	public String loanAcceptance(@Valid @ModelAttribute("loanAmor") Amortization loanAmor, BindingResult result,
+			Model model, HttpSession session) {
+
+		if (result.hasErrors()) {
+
+			return "loan-amortization";
+		}
+		LoanStatus ls = (LoanStatus) session.getAttribute("ls");
+		AcceptLoan lAcc = (AcceptLoan) session.getAttribute("ac");
+		System.out.println(lAcc.getLoanId());
+
+		Long loanNumber = loanAcceptService.updateAndAdd(ls, lAcc, loanAmor);
+		Long applicationNo = ls.getLoan().getLoanId();
+
+		String number = "+91" + ls.getLoan().getBorrower().getBorrowerContactNo();
+		String message = "Loan Application Accepted for application number - " + applicationNo + " \n "
+				+ " Generated Loan Number is - " + loanNumber;
+		String email = ls.getLoan().getBorrower().getBorrowerEmail();
+		String subject = "Loan Number Generated"; 
+		
+		SmsRequest smsRequest = new SmsRequest(number, message, email);
+
+		smsService.sendSms(smsRequest);
+		mailSender.sendMail(smsRequest, subject);
+		
+		session.removeAttribute("ls");
+		session.removeAttribute("lAcc");
+
+		model.addAttribute("loanNumber", loanNumber);
+		return "loan-generation-confirmation";
+
+	}
+
+	@GetMapping("/rejectLoan")
+	public String rejectPendingLoan(@RequestParam String id, Model model, HttpSession session) {
+		Long statusId = Long.parseLong(id);
+		session.setAttribute("id", statusId);
+		return "reject-confirm";
+	}
+
+	@PostMapping("/rejectConfirm")
+	public String confirmRejectPendingLoan(Model model, HttpSession session) {
+
+		Long loanId = (Long) session.getAttribute("id");
+		loanAcceptService.rejectLoan(loanId);
+		return "redirect:/manager/seePendingList";
+	}
+	@GetMapping("/loanDetails")
+	public String loanDetailsList(Model model) {
+		
+		List<LoanAmortization> listLoan = loanAcceptService.getAllLoan();
+		model.addAttribute("listLoan", listLoan);
+		return "loan-list";
+	}
+	
+	@GetMapping("/viewPaymentDetails")
+	public String payementDetails(@RequestParam String loanNumber, Model model, HttpSession session) {
+		
+		Long lNo = Long.parseLong(loanNumber);
+		
+		loanAcceptService.findLoanById(2020-07-25 13:10:35.250  INFO 4472 --- [  restartedMain] com.elaon.ELoanProjectApplication        : Started ELoanProjectApplication in 1.045 seconds (JVM running for 169.645)
+				2020-07-25 13:10:35.251  INFO 4472 --- [  restartedMain] .ConditionEvaluationDeltaLoggingListener : Condition evaluation unchanged
+				2020-07-25 13:10:45.123  INFO 4472 --- [    Thread-1014] o.s.s.concurrent.ThreadPoolTaskExecutor  : Shutting down ExecutorService 'applicationTaskExecutor'
+				2020-07-25 13:10:45.123  INFO 4472 --- [    Thread-1014] j.LocalContainerEntityManagerFactoryBean : Closing JPA EntityManagerFactory for persistence unit 'default'
+				2020-07-25 13:10:45.124  INFO 4472 --- [    Thread-1014] com.zaxxer.hikari.HikariDataSource       : HikariPool-7 - Shutdown initiated...
+				2020-07-25 13:10:45.128  INFO 4472 --- [    Thread-1014] com.zaxxer.hikari.HikariDataSource       : HikariPool-7 - Shutdown completed.
+
+				  .   ____          _            __ _ _
+				 /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+				( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+				 \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+				  '  |____| .__|_| |_|_| |_\__, | / / / /
+				 =========|_|==============|___/=/_/_/_/
+				 :: Spring Boot ::        (v2.3.1.RELEASE)
+
+				2020-07-25 13:10:45.391  INFO 4472 --- [  restartedMain] com.elaon.ELoanProjectApplication        : Starting ELoanProjectApplication on LAPTOP-OG8377K5 with PID 4472 (E:\Spring Projects\E-Loan-Project\E-Loan-Project\target\classes started by Bayvao Verma in E:\Spring Projects\E-Loan-Project\E-Loan-Project)
+				2020-07-25 13:10:45.391  INFO 4472 --- [  restartedMain] com.elaon.ELoanProjectApplication        : No active profile set, falling back to default profiles: default
+				2020-07-25 13:10:45.596  INFO 4472 --- [  restartedMain] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+				2020-07-25 13:10:45.615  INFO 4472 --- [  restartedMain] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 17ms. Found 7 JPA repository interfaces.
+				2020-07-25 13:10:45.848  INFO 4472 --- [  restartedMain] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port(s): 8080 (http)
+				2020-07-25 13:10:45.849  INFO 4472 --- [  restartedMain] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+				2020-07-25 13:10:45.849  INFO 4472 --- [  restartedMain] org.apache.catalina.core.StandardEngine  : Starting Servlet engine: [Apache Tomcat/9.0.36]
+				2020-07-25 13:10:45.924  INFO 4472 --- [  restartedMain] org.apache.jasper.servlet.TldScanner     : At least one JAR was scanned for TLDs yet contained no TLDs. Enable debug logging for this logger for a complete list of JARs that were scanned but no TLDs were found in them. Skipping unneeded JARs during scanning can improve startup time and JSP compilation time.
+				2020-07-25 13:10:45.927  INFO 4472 --- [  restartedMain] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+				2020-07-25 13:10:45.927  INFO 4472 --- [  restartedMain] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 534 ms
+				2020-07-25 13:10:45.982  INFO 4472 --- [  restartedMain] o.hibernate.jpa.internal.util.LogHelper  : HHH000204: Processing PersistenceUnitInfo [name: default]
+				2020-07-25 13:10:46.009  INFO 4472 --- [  restartedMain] com.zaxxer.hikari.HikariDataSource       : HikariPool-8 - Starting...
+				2020-07-25 13:10:46.014  INFO 4472 --- [  restartedMain] com.zaxxer.hikari.HikariDataSource       : HikariPool-8 - Start completed.
+				2020-07-25 13:10:46.014  INFO 4472 --- [  restartedMain] org.hibernate.dialect.Dialect            : HHH000400: Using dialect: org.hibernate.dialect.MySQL8Dialect
+				2020-07-25 13:10:46.077  INFO 4472 --- [  restartedMain] o.h.e.t.j.p.i.JtaPlatformInitiator       : HHH000490: Using JtaPlatform implementation: [org.hibernate.engine.transaction.jta.platform.internal.NoJtaPlatform]
+				2020-07-25 13:10:46.078  INFO 4472 --- [  restartedMain] j.LocalContainerEntityManagerFactoryBean : Initialized JPA EntityManagerFactory for persistence unit 'default'
+				2020-07-25 13:10:46.093  WARN 4472 --- [  restartedMain] JpaBaseConfiguration$JpaWebConfiguration : spring.jpa.open-in-view is enabled by default. Therefore, database queries may be performed during view rendering. Explicitly configure spring.jpa.open-in-view to disable this warning
+				2020-07-25 13:10:46.106  INFO 4472 --- [  restartedMain] com.elaon.config.TwilioInitializer       : Twilio Initialized ... congo! AC44bf2f58c126b8c3ae50fbd2503aeb3f
+				2020-07-25 13:10:46.111  INFO 4472 --- [  restartedMain] o.s.s.p.JdbcUserDetailsManager           : No authentication manager set. Reauthentication of users when changing passwords will not be performed.
+				2020-07-25 13:10:46.208  INFO 4472 --- [  restartedMain] o.s.s.web.DefaultSecurityFilterChain     : Creating filter chain: any request, [org.springframework.security.web.context.request.async.WebAsyncManagerIntegrationFilter@527d39fc, org.springframework.security.web.context.SecurityContextPersistenceFilter@122590, org.springframework.security.web.header.HeaderWriterFilter@1f9b2a26, org.springframework.security.web.csrf.CsrfFilter@2d5cf62e, org.springframework.security.web.authentication.logout.LogoutFilter@6c822e17, org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter@5234e2d5, org.springframework.security.web.savedrequest.RequestCacheAwareFilter@5bcfcb33, org.springframework.security.web.servletapi.SecurityContextHolderAwareRequestFilter@1d431076, org.springframework.security.web.authentication.rememberme.RememberMeAuthenticationFilter@73a6d308, org.springframework.security.web.authentication.AnonymousAuthenticationFilter@36b249fe, org.springframework.security.web.session.SessionManagementFilter@4ab5476e, org.springframework.security.web.access.ExceptionTranslationFilter@5a8020c9, org.springframework.security.web.access.intercept.FilterSecurityInterceptor@5d27319c]
+				2020-07-25 13:10:46.243  INFO 4472 --- [  restartedMain] o.s.s.concurrent.ThreadPoolTaskExecutor  : Initializing ExecutorService 'applicationTaskExecutor'
+				2020-07-25 13:10:46.293  INFO 4472 --- [  restartedMain] o.s.b.d.a.OptionalLiveReloadServer       : LiveReload server is running on port 35729
+				2020-07-25 13:10:46.304  INFO 4472 --- [  restartedMain] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port(s): 8080 (http) with context path ''
+				2020-07-25 13:10:46.308  INFO 4472 --- [  restartedMain] com.elaon.ELoanProjectApplication        : Started ELoanProjectApplication in 0.939 seconds (JVM running for 180.702)
+				2020-07-25 13:10:46.309  INFO 4472 --- [  restartedMain] .ConditionEvaluationDeltaLoggingListener : Condition evaluation unchanged
+				2020-07-25 13:10:57.102  INFO 4472 --- [    Thread-1216] o.s.s.concurrent.ThreadPoolTaskExecutor  : Shutting down ExecutorService 'applicationTaskExecutor'
+				2020-07-25 13:10:57.103  INFO 4472 --- [    Thread-1216] j.LocalContainerEntityManagerFactoryBean : Closing JPA EntityManagerFactory for persistence unit 'default'
+				2020-07-25 13:10:57.104  INFO 4472 --- [    Thread-1216] com.zaxxer.hikari.HikariDataSource       : HikariPool-8 - Shutdown initiated...
+				2020-07-25 13:10:57.109  INFO 4472 --- [    Thread-1216] com.zaxxer.hikari.HikariDataSource       : HikariPool-8 - Shutdown completed.
+
+				  .   ____          _            __ _ _
+				 /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+				( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+				 \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+				  '  |____| .__|_| |_|_| |_\__, | / / / /
+				 =========|_|==============|___/=/_/_/_/
+				 :: Spring Boot ::        (v2.3.1.RELEASE)
+
+				2020-07-25 13:10:57.266  INFO 4472 --- [  restartedMain] com.elaon.ELoanProjectApplication        : Starting ELoanProjectApplication on LAPTOP-OG8377K5 with PID 4472 (E:\Spring Projects\E-Loan-Project\E-Loan-Project\target\classes started by Bayvao Verma in E:\Spring Projects\E-Loan-Project\E-Loan-Project)
+				2020-07-25 13:10:57.267  INFO 4472 --- [  restartedMain] com.elaon.ELoanProjectApplication        : No active profile set, falling back to default profiles: default
+				2020-07-25 13:10:57.468  INFO 4472 --- [  restartedMain] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+				2020-07-25 13:10:57.483  INFO 4472 --- [  restartedMain] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 15ms. Found 7 JPA repository interfaces.
+				2020-07-25 13:10:57.689  INFO 4472 --- [  restartedMain] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port(s): 8080 (http)
+				2020-07-25 13:10:57.690  INFO 4472 --- [  restartedMain] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+				2020-07-25 13:10:57.690  INFO 4472 --- [  restartedMain] org.apache.catalina.core.StandardEngine  : Starting Servlet engine: [Apache Tomcat/9.0.36]
+				2020-07-25 13:10:57.762  INFO 4472 --- [  restartedMain] org.apache.jasper.servlet.TldScanner     : At least one JAR was scanned for TLDs yet contained no TLDs. Enable debug logging for this logger for a complete list of JARs that were scanned but no TLDs were found in them. Skipping unneeded JARs during scanning can improve startup time and JSP compilation time.
+				2020-07-25 13:10:57.764  INFO 4472 --- [  restartedMain] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+				2020-07-25 13:10:57.764  INFO 4472 --- [  restartedMain] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 495 ms
+				2020-07-25 13:10:57.814  INFO 4472 --- [  restartedMain] o.hibernate.jpa.internal.util.LogHelper  : HHH000204: Processing PersistenceUnitInfo [name: default]
+				2020-07-25 13:10:57.835  INFO 4472 --- [  restartedMain] com.zaxxer.hikari.HikariDataSource       : HikariPool-9 - Starting...
+				2020-07-25 13:10:57.839  INFO 4472 --- [  restartedMain] com.zaxxer.hikari.HikariDataSource       : HikariPool-9 - Start completed.
+				2020-07-25 13:10:57.839  INFO 4472 --- [  restartedMain] org.hibernate.dialect.Dialect            : HHH000400: Using dialect: org.hibernate.dialect.MySQL8Dialect
+				2020-07-25 13:10:57.904  INFO 4472 --- [  restartedMain] o.h.e.t.j.p.i.JtaPlatformInitiator       : HHH000490: Using JtaPlatform implementation: [org.hibernate.engine.transaction.jta.platform.internal.NoJtaPlatform]
+				2020-07-25 13:10:57.905  INFO 4472 --- [  restartedMain] j.LocalContainerEntityManagerFactoryBean : Initialized JPA EntityManagerFactory for persistence unit 'default'
+				2020-07-25 13:10:57.922  WARN 4472 --- [  restartedMain] JpaBaseConfiguration$JpaWebConfiguration : spring.jpa.open-in-view is enabled by default. Therefore, database queries may be performed during view rendering. Explicitly configure spring.jpa.open-in-view to disable this warning
+				2020-07-25 13:10:57.937  INFO 4472 --- [  restartedMain] com.elaon.config.TwilioInitializer       : Twilio Initialized ... congo! AC44bf2f58c126b8c3ae50fbd2503aeb3f
+				2020-07-25 13:10:57.942  INFO 4472 --- [  restartedMain] o.s.s.p.JdbcUserDetailsManager           : No authentication manager set. Reauthentication of users when changing passwords will not be performed.
+				2020-07-25 13:10:58.053  INFO 4472 --- [  restartedMain] o.s.s.web.DefaultSecurityFilterChain     : Creating filter chain: any request, [org.springframework.security.web.context.request.async.WebAsyncManagerIntegrationFilter@6b14ea65, org.springframework.security.web.context.SecurityContextPersistenceFilter@775da256, org.springframework.security.web.header.HeaderWriterFilter@3080e0ca, org.springframework.security.web.csrf.CsrfFilter@583b0beb, org.springframework.security.web.authentication.logout.LogoutFilter@40cb35ca, org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter@1a083b0c, org.springframework.security.web.savedrequest.RequestCacheAwareFilter@56f5f10b, org.springframework.security.web.servletapi.SecurityContextHolderAwareRequestFilter@61c4cdaf, org.springframework.security.web.authentication.rememberme.RememberMeAuthenticationFilter@73b9bc0f, org.springframework.security.web.authentication.AnonymousAuthenticationFilter@1e7c40a5, org.springframework.security.web.session.SessionManagementFilter@77b98b19, org.springframework.security.web.access.ExceptionTranslationFilter@77aac462, org.springframework.security.web.access.intercept.FilterSecurityInterceptor@1ecd7a18]
+				2020-07-25 13:10:58.088  INFO 4472 --- [  restartedMain] o.s.s.concurrent.ThreadPoolTaskExecutor  : Initializing ExecutorService 'applicationTaskExecutor'
+				2020-07-25 13:10:58.139  INFO 4472 --- [  restartedMain] o.s.b.d.a.OptionalLiveReloadServer       : LiveReload server is running on port 35729
+				2020-07-25 13:10:58.151  INFO 4472 --- [  restartedMain] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port(s): 8080 (http) with context path ''
+				2020-07-25 13:10:58.154  INFO 4472 --- [  restartedMain] com.elaon.ELoanProjectApplication        : Started ELoanProjectApplication in 0.907 seconds (JVM running for 192.548)
+				2020-07-25 13:10:58.155  INFO 4472 --- [  restartedMain] .ConditionEvaluationDeltaLoggingListener : Condition evaluation unchanged
+				2020-07-25 13:11:00.923  INFO 4472 --- [    Thread-1418] o.s.s.concurrent.ThreadPoolTaskExecutor  : Shutting down ExecutorService 'applicationTaskExecutor'
+				2020-07-25 13:11:00.924  INFO 4472 --- [    Thread-1418] j.LocalContainerEntityManagerFactoryBean : Closing JPA EntityManagerFactory for persistence unit 'default'
+				2020-07-25 13:11:00.924  INFO 4472 --- [    Thread-1418] com.zaxxer.hikari.HikariDataSource       : HikariPool-9 - Shutdown initiated...
+				2020-07-25 13:11:00.926  INFO 4472 --- [    Thread-1418] com.zaxxer.hikari.HikariDataSource       : HikariPool-9 - Shutdown completed.
+
+				  .   ____          _            __ _ _
+				 /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+				( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+				 \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+				  '  |____| .__|_| |_|_| |_\__, | / / / /
+				 =========|_|==============|___/=/_/_/_/
+				 :: Spring Boot ::        (v2.3.1.RELEASE)
+
+				2020-07-25 13:11:01.222  INFO 4472 --- [  restartedMain] com.elaon.ELoanProjectApplication        : Starting ELoanProjectApplication on LAPTOP-OG8377K5 with PID 4472 (E:\Spring Projects\E-Loan-Project\E-Loan-Project\target\classes started by Bayvao Verma in E:\Spring Projects\E-Loan-Project\E-Loan-Project)
+				2020-07-25 13:11:01.222  INFO 4472 --- [  restartedMain] com.elaon.ELoanProjectApplication        : No active profile set, falling back to default profiles: default
+				2020-07-25 13:11:01.447  INFO 4472 --- [  restartedMain] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+				2020-07-25 13:11:01.465  INFO 4472 --- [  restartedMain] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 17ms. Found 7 JPA repository interfaces.
+				2020-07-25 13:11:01.695  INFO 4472 --- [  restartedMain] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port(s): 8080 (http)
+				2020-07-25 13:11:01.696  INFO 4472 --- [  restartedMain] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+				2020-07-25 13:11:01.696  INFO 4472 --- [  restartedMain] org.apache.catalina.core.StandardEngine  : Starting Servlet engine: [Apache Tomcat/9.0.36]
+				2020-07-25 13:11:01.769  INFO 4472 --- [  restartedMain] org.apache.jasper.servlet.TldScanner     : At least one JAR was scanned for TLDs yet contained no TLDs. Enable debug logging for this logger for a complete list of JARs that were scanned but no TLDs were found in them. Skipping unneeded JARs during scanning can improve startup time and JSP compilation time.
+				2020-07-25 13:11:01.771  INFO 4472 --- [  restartedMain] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+				2020-07-25 13:11:01.771  INFO 4472 --- [  restartedMain] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 547 ms
+				2020-07-25 13:11:01.822  INFO 4472 --- [  restartedMain] o.hibernate.jpa.internal.util.LogHelper  : HHH000204: Processing PersistenceUnitInfo [name: default]
+				2020-07-25 13:11:01.844  INFO 4472 --- [  restartedMain] com.zaxxer.hikari.HikariDataSource       : HikariPool-10 - Starting...
+				2020-07-25 13:11:01.849  INFO 4472 --- [  restartedMain] com.zaxxer.hikari.HikariDataSource       : HikariPool-10 - Start completed.
+				2020-07-25 13:11:01.849  INFO 4472 --- [  restartedMain] org.hibernate.dialect.Dialect            : HHH000400: Using dialect: org.hibernate.dialect.MySQL8Dialect
+				2020-07-25 13:11:01.910  INFO 4472 --- [  restartedMain] o.h.e.t.j.p.i.JtaPlatformInitiator       : HHH000490: Using JtaPlatform implementation: [org.hibernate.engine.transaction.jta.platform.internal.NoJtaPlatform]
+				2020-07-25 13:11:01.910  INFO 4472 --- [  restartedMain] j.LocalContainerEntityManagerFactoryBean : Initialized JPA EntityManagerFactory for persistence unit 'default'
+				2020-07-25 13:11:01.926  WARN 4472 --- [  restartedMain] JpaBaseConfiguration$JpaWebConfiguration : spring.jpa.open-in-view is enabled by default. Therefore, database queries may be performed during view rendering. Explicitly configure spring.jpa.open-in-view to disable this warning
+				2020-07-25 13:11:01.940  INFO 4472 --- [  restartedMain] com.elaon.config.TwilioInitializer       : Twilio Initialized ... congo! AC44bf2f58c126b8c3ae50fbd2503aeb3f
+				2020-07-25 13:11:01.945  INFO 4472 --- [  restartedMain] o.s.s.p.JdbcUserDetailsManager           : No authentication manager set. Reauthentication of users when changing passwords will not be performed.
+				2020-07-25 13:11:02.047  INFO 4472 --- [  restartedMain] o.s.s.web.DefaultSecurityFilterChain     : Creating filter chain: any request, [org.springframework.security.web.context.request.async.WebAsyncManagerIntegrationFilter@2e8773e8, org.springframework.security.web.context.SecurityContextPersistenceFilter@693de582, org.springframework.security.web.header.HeaderWriterFilter@56eea8f6, org.springframework.security.web.csrf.CsrfFilter@2f5b413b, org.springframework.security.web.authentication.logout.LogoutFilter@6be174e3, org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter@2c996a73, org.springframework.security.web.savedrequest.RequestCacheAwareFilter@346eaa3, org.springframework.security.web.servletapi.SecurityContextHolderAwareRequestFilter@204c4b25, org.springframework.security.web.authentication.rememberme.RememberMeAuthenticationFilter@198146bc, org.springframework.security.web.authentication.AnonymousAuthenticationFilter@14590c39, org.springframework.security.web.session.SessionManagementFilter@1c9a3db3, org.springframework.security.web.access.ExceptionTranslationFilter@34d3b95, org.springframework.security.web.access.intercept.FilterSecurityInterceptor@3d50f68f]
+				2020-07-25 13:11:02.086  INFO 4472 --- [  restartedMain] o.s.s.concurrent.ThreadPoolTaskExecutor  : Initializing ExecutorService 'applicationTaskExecutor'
+				2020-07-25 13:11:02.140  INFO 4472 --- [  restartedMain] o.s.b.d.a.OptionalLiveReloadServer       : LiveReload server is running on port 35729
+				2020-07-25 13:11:02.152  INFO 4472 --- [  restartedMain] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port(s): 8080 (http) with context path ''
+				2020-07-25 13:11:02.156  INFO 4472 --- [  restartedMain] com.elaon.ELoanProjectApplication        : Started ELoanProjectApplication in 0.953 seconds (JVM running for 196.549)
+				2020-07-25 13:11:02.157  INFO 4472 --- [  restartedMain] .ConditionEvaluationDeltaLoggingListener : Condition evaluation unchanged
+				2020-07-25 13:16:43.704  INFO 4472 --- [nio-8080-exec-1] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring DispatcherServlet 'dispatcherServlet'
+				2020-07-25 13:16:43.705  INFO 4472 --- [nio-8080-exec-1] o.s.web.servlet.DispatcherServlet        : Initializing Servlet 'dispatcherServlet'
+				2020-07-25 13:16:43.708  INFO 4472 --- [nio-8080-exec-1] o.s.web.servlet.DispatcherServlet        : Completed initialization in 3 ms
+				2020-07-25 13:31:39.494  INFO 4472 --- [    Thread-1620] o.s.s.concurrent.ThreadPoolTaskExecutor  : Shutting down ExecutorService 'applicationTaskExecutor'
+				2020-07-25 13:31:39.495  INFO 4472 --- [    Thread-1620] j.LocalContainerEntityManagerFactoryBean : Closing JPA EntityManagerFactory for persistence unit 'default'
+				2020-07-25 13:31:39.495  INFO 4472 --- [    Thread-1620] com.zaxxer.hikari.HikariDataSource       : HikariPool-10 - Shutdown initiated...
+				2020-07-25 13:31:39.497  INFO 4472 --- [    Thread-1620] com.zaxxer.hikari.HikariDataSource       : HikariPool-10 - Shutdown completed.
+
+				  .   ____          _            __ _ _
+				 /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+				( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+				 \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+				  '  |____| .__|_| |_|_| |_\__, | / / / /
+				 =========|_|==============|___/=/_/_/_/
+				 :: Spring Boot ::        (v2.3.1.RELEASE)
+
+				2020-07-25 13:31:39.671  INFO 4472 --- [  restartedMain] com.elaon.ELoanProjectApplication        : Starting ELoanProjectApplication on LAPTOP-OG8377K5 with PID 4472 (E:\Spring Projects\E-Loan-Project\E-Loan-Project\target\classes started by Bayvao Verma in E:\Spring Projects\E-Loan-Project\E-Loan-Project)
+				2020-07-25 13:31:39.671  INFO 4472 --- [  restartedMain] com.elaon.ELoanProjectApplication        : No active profile set, falling back to default profiles: default
+				2020-07-25 13:31:40.003  INFO 4472 --- [  restartedMain] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+				2020-07-25 13:31:40.028  INFO 4472 --- [  restartedMain] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 25ms. Found 7 JPA repository interfaces.
+				2020-07-25 13:31:40.378  INFO 4472 --- [  restartedMain] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port(s): 8080 (http)
+				2020-07-25 13:31:40.378  INFO 4472 --- [  restartedMain] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+				2020-07-25 13:31:40.378  INFO 4472 --- [  restartedMain] org.apache.catalina.core.StandardEngine  : Starting Servlet engine: [Apache Tomcat/9.0.36]
+				2020-07-25 13:31:40.461  INFO 4472 --- [  restartedMain] org.apache.jasper.servlet.TldScanner     : At least one JAR was scanned for TLDs yet contained no TLDs. Enable debug logging for this logger for a complete list of JARs that were scanned but no TLDs were found in them. Skipping unneeded JARs during scanning can improve startup time and JSP compilation time.
+				2020-07-25 13:31:40.464  INFO 4472 --- [  restartedMain] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+				2020-07-25 13:31:40.464  INFO 4472 --- [  restartedMain] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 791 ms
+				2020-07-25 13:31:40.532  INFO 4472 --- [  restartedMain] o.hibernate.jpa.internal.util.LogHelper  : HHH000204: Processing PersistenceUnitInfo [name: default]
+				2020-07-25 13:31:40.558  INFO 4472 --- [  restartedMain] com.zaxxer.hikari.HikariDataSource       : HikariPool-11 - Starting...
+				2020-07-25 13:31:40.563  INFO 4472 --- [  restartedMain] com.zaxxer.hikari.HikariDataSource       : HikariPool-11 - Start completed.
+				2020-07-25 13:31:40.563  INFO 4472 --- [  restartedMain] org.hibernate.dialect.Dialect            : HHH000400: Using dialect: org.hibernate.dialect.MySQL8Dialect
+				2020-07-25 13:31:40.648  INFO 4472 --- [  restartedMain] o.h.e.t.j.p.i.JtaPlatformInitiator       : HHH000490: Using JtaPlatform implementation: [org.hibernate.engine.transaction.jta.platform.internal.NoJtaPlatform]
+				2020-07-25 13:31:40.648  INFO 4472 --- [  restartedMain] j.LocalContainerEntityManagerFactoryBean : Initialized JPA EntityManagerFactory for persistence unit 'default'
+				2020-07-25 13:31:40.676  WARN 4472 --- [  restartedMain] JpaBaseConfiguration$JpaWebConfiguration : spring.jpa.open-in-view is enabled by default. Therefore, database queries may be performed during view rendering. Explicitly configure spring.jpa.open-in-view to disable this warning
+				2020-07-25 13:31:40.701  INFO 4472 --- [  restartedMain] com.elaon.config.TwilioInitializer       : Twilio Initialized ... congo! AC44bf2f58c126b8c3ae50fbd2503aeb3f
+				2020-07-25 13:31:40.708  INFO 4472 --- [  restartedMain] o.s.s.p.JdbcUserDetailsManager           : No authentication manager set. Reauthentication of users when changing passwords will not be performed.
+				2020-07-25 13:31:40.844  INFO 4472 --- [  restartedMain] o.s.s.web.DefaultSecurityFilterChain     : Creating filter chain: any request, [org.springframework.security.web.context.request.async.WebAsyncManagerIntegrationFilter@69cf07f6, org.springframework.security.web.context.SecurityContextPersistenceFilter@5cff9a38, org.springframework.security.web.header.HeaderWriterFilter@33b8e370, org.springframework.security.web.csrf.CsrfFilter@3bf6a369, org.springframework.security.web.authentication.logout.LogoutFilter@740ee2fd, org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter@5976a19b, org.springframework.security.web.savedrequest.RequestCacheAwareFilter@16ca3721, org.springframework.security.web.servletapi.SecurityContextHolderAwareRequestFilter@621df5eb, org.springframework.security.web.authentication.rememberme.RememberMeAuthenticationFilter@229984e9, org.springframework.security.web.authentication.AnonymousAuthenticationFilter@6f1040c6, org.springframework.security.web.session.SessionManagementFilter@521c86f9, org.springframework.security.web.access.ExceptionTranslationFilter@437131cf, org.springframework.security.web.access.intercept.FilterSecurityInterceptor@841c31a]
+				2020-07-25 13:31:40.921  INFO 4472 --- [  restartedMain] o.s.s.concurrent.ThreadPoolTaskExecutor  : Initializing ExecutorService 'applicationTaskExecutor'
+				2020-07-25 13:31:41.003  INFO 4472 --- [  restartedMain] o.s.b.d.a.OptionalLiveReloadServer       : LiveReload server is running on port 35729
+				2020-07-25 13:31:41.026  INFO 4472 --- [  restartedMain] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port(s): 8080 (http) with context path ''
+				2020-07-25 13:31:41.031  INFO 4472 --- [  restartedMain] com.elaon.ELoanProjectApplication        : Started ELoanProjectApplication in 1.384 seconds (JVM running for 1435.425)
+				2020-07-25 13:31:41.033  INFO 4472 --- [  restartedMain] .ConditionEvaluationDeltaLoggingListener : Condition evaluation unchanged
+				2020-07-25 13:32:14.987  INFO 4472 --- [    Thread-1822] o.s.s.concurrent.ThreadPoolTaskExecutor  : Shutting down ExecutorService 'applicationTaskExecutor'
+				2020-07-25 13:32:14.988  INFO 4472 --- [    Thread-1822] j.LocalContainerEntityManagerFactoryBean : Closing JPA EntityManagerFactory for persistence unit 'default'
+				2020-07-25 13:32:14.989  INFO 4472 --- [    Thread-1822] com.zaxxer.hikari.HikariDataSource       : HikariPool-11 - Shutdown initiated...
+				2020-07-25 13:32:14.991  INFO 4472 --- [    Thread-1822] com.zaxxer.hikari.HikariDataSource       : HikariPool-11 - Shutdown completed.
+
+				  .   ____          _            __ _ _
+				 /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+				( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+				 \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+				  '  |____| .__|_| |_|_| |_\__, | / / / /
+				 =========|_|==============|___/=/_/_/_/
+				 :: Spring Boot ::        (v2.3.1.RELEASE)
+
+				2020-07-25 13:32:15.206  INFO 4472 --- [  restartedMain] com.elaon.ELoanProjectApplication        : Starting ELoanProjectApplication on LAPTOP-OG8377K5 with PID 4472 (E:\Spring Projects\E-Loan-Project\E-Loan-Project\target\classes started by Bayvao Verma in E:\Spring Projects\E-Loan-Project\E-Loan-Project)
+				2020-07-25 13:32:15.206  INFO 4472 --- [  restartedMain] com.elaon.ELoanProjectApplication        : No active profile set, falling back to default profiles: default
+				2020-07-25 13:32:15.497  INFO 4472 --- [  restartedMain] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+				2020-07-25 13:32:15.519  INFO 4472 --- [  restartedMain] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 21ms. Found 7 JPA repository interfaces.
+				2020-07-25 13:32:15.800  INFO 4472 --- [  restartedMain] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port(s): 8080 (http)
+				2020-07-25 13:32:15.801  INFO 4472 --- [  restartedMain] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+				2020-07-25 13:32:15.801  INFO 4472 --- [  restartedMain] org.apache.catalina.core.StandardEngine  : Starting Servlet engine: [Apache Tomcat/9.0.36]
+				2020-07-25 13:32:15.890  INFO 4472 --- [  restartedMain] org.apache.jasper.servlet.TldScanner     : At least one JAR was scanned for TLDs yet contained no TLDs. Enable debug logging for this logger for a complete list of JARs that were scanned but no TLDs were found in them. Skipping unneeded JARs during scanning can improve startup time and JSP compilation time.
+				2020-07-25 13:32:15.893  INFO 4472 --- [  restartedMain] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+				2020-07-25 13:32:15.893  INFO 4472 --- [  restartedMain] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 684 ms
+				2020-07-25 13:32:15.952  INFO 4472 --- [  restartedMain] o.hibernate.jpa.internal.util.LogHelper  : HHH000204: Processing PersistenceUnitInfo [name: default]
+				2020-07-25 13:32:15.983  INFO 4472 --- [  restartedMain] com.zaxxer.hikari.HikariDataSource       : HikariPool-12 - Starting...
+				2020-07-25 13:32:15.989  INFO 4472 --- [  restartedMain] com.zaxxer.hikari.HikariDataSource       : HikariPool-12 - Start completed.
+				2020-07-25 13:32:15.989  INFO 4472 --- [  restartedMain] org.hibernate.dialect.Dialect            : HHH000400: Using dialect: org.hibernate.dialect.MySQL8Dialect
+				2020-07-25 13:32:16.073  INFO 4472 --- [  restartedMain] o.h.e.t.j.p.i.JtaPlatformInitiator       : HHH000490: Using JtaPlatform implementation: [org.hibernate.engine.transaction.jta.platform.internal.NoJtaPlatform]
+				2020-07-25 13:32:16.073  INFO 4472 --- [  restartedMain] j.LocalContainerEntityManagerFactoryBean : Initialized JPA EntityManagerFactory for persistence unit 'default'
+				2020-07-25 13:32:16.096  WARN 4472 --- [  restartedMain] JpaBaseConfiguration$JpaWebConfiguration : spring.jpa.open-in-view is enabled by default. Therefore, database queries may be performed during view rendering. Explicitly configure spring.jpa.open-in-view to disable this warning
+				2020-07-25 13:32:16.118  INFO 4472 --- [  restartedMain] com.elaon.config.TwilioInitializer       : Twilio Initialized ... congo! AC44bf2f58c126b8c3ae50fbd2503aeb3f
+				2020-07-25 13:32:16.124  INFO 4472 --- [  restartedMain] o.s.s.p.JdbcUserDetailsManager           : No authentication manager set. Reauthentication of users when changing passwords will not be performed.
+				2020-07-25 13:32:16.268  INFO 4472 --- [  restartedMain] o.s.s.web.DefaultSecurityFilterChain     : Creating filter chain: any request, [org.springframework.security.web.context.request.async.WebAsyncManagerIntegrationFilter@1238de52, org.springframework.security.web.context.SecurityContextPersistenceFilter@5ab792bc, org.springframework.security.web.header.HeaderWriterFilter@648dd626, org.springframework.security.web.csrf.CsrfFilter@6f257445, org.springframework.security.web.authentication.logout.LogoutFilter@507f6820, org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter@7ff9f423, org.springframework.security.web.savedrequest.RequestCacheAwareFilter@164056, org.springframework.security.web.servletapi.SecurityContextHolderAwareRequestFilter@aa09a94, org.springframework.security.web.authentication.rememberme.RememberMeAuthenticationFilter@7cf19daf, org.springframework.security.web.authentication.AnonymousAuthenticationFilter@455ab724, org.springframework.security.web.session.SessionManagementFilter@1ef45a7b, org.springframework.security.web.access.ExceptionTranslationFilter@246fd29e, org.springframework.security.web.access.intercept.FilterSecurityInterceptor@6286b67f]
+				2020-07-25 13:32:16.328  INFO 4472 --- [  restartedMain] o.s.s.concurrent.ThreadPoolTaskExecutor  : Initializing ExecutorService 'applicationTaskExecutor'
+				2020-07-25 13:32:16.401  INFO 4472 --- [  restartedMain] o.s.b.d.a.OptionalLiveReloadServer       : LiveReload server is running on port 35729
+				2020-07-25 13:32:16.418  INFO 4472 --- [  restartedMain] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port(s): 8080 (http) with context path ''
+				2020-07-25 13:32:16.439  INFO 4472 --- [  restartedMain] com.elaon.ELoanProjectApplication        : Started ELoanProjectApplication in 1.252 seconds (JVM running for 1470.828)
+				2020-07-25 13:32:16.441  INFO 4472 --- [  restartedMain] .ConditionEvaluationDeltaLoggingListener : Condition evaluation unchanged
+				2020-07-25 13:32:42.335  INFO 4472 --- [    Thread-2024] o.s.s.concurrent.ThreadPoolTaskExecutor  : Shutting down ExecutorService 'applicationTaskExecutor'
+				2020-07-25 13:32:42.336  INFO 4472 --- [    Thread-2024] j.LocalContainerEntityManagerFactoryBean : Closing JPA EntityManagerFactory for persistence unit 'default'
+				2020-07-25 13:32:42.337  INFO 4472 --- [    Thread-2024] com.zaxxer.hikari.HikariDataSource       : HikariPool-12 - Shutdown initiated...
+				2020-07-25 13:32:42.338  INFO 4472 --- [    Thread-2024] com.zaxxer.hikari.HikariDataSource       : HikariPool-12 - Shutdown completed.
+
+				  .   ____          _            __ _ _
+				 /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+				( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+				 \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+				  '  |____| .__|_| |_|_| |_\__, | / / / /
+				 =========|_|==============|___/=/_/_/_/
+				 :: Spring Boot ::        (v2.3.1.RELEASE)
+
+				2020-07-25 13:32:42.513  INFO 4472 --- [  restartedMain] com.elaon.ELoanProjectApplication        : Starting ELoanProjectApplication on LAPTOP-OG8377K5 with PID 4472 (E:\Spring Projects\E-Loan-Project\E-Loan-Project\target\classes started by Bayvao Verma in E:\Spring Projects\E-Loan-Project\E-Loan-Project)
+				2020-07-25 13:32:42.513  INFO 4472 --- [  restartedMain] com.elaon.ELoanProjectApplication        : No active profile set, falling back to default profiles: default
+				2020-07-25 13:32:42.784  INFO 4472 --- [  restartedMain] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+				2020-07-25 13:32:42.804  INFO 4472 --- [  restartedMain] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 19ms. Found 7 JPA repository interfaces.
+				2020-07-25 13:32:43.065  INFO 4472 --- [  restartedMain] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port(s): 8080 (http)
+				2020-07-25 13:32:43.066  INFO 4472 --- [  restartedMain] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+				2020-07-25 13:32:43.066  INFO 4472 --- [  restartedMain] org.apache.catalina.core.StandardEngine  : Starting Servlet engine: [Apache Tomcat/9.0.36]
+				2020-07-25 13:32:43.145  INFO 4472 --- [  restartedMain] org.apache.jasper.servlet.TldScanner     : At least one JAR was scanned for TLDs yet contained no TLDs. Enable debug logging for this logger for a complete list of JARs that were scanned but no TLDs were found in them. Skipping unneeded JARs during scanning can improve startup time and JSP compilation time.
+				2020-07-25 13:32:43.148  INFO 4472 --- [  restartedMain] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+				2020-07-25 13:32:43.148  INFO 4472 --- [  restartedMain] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 633 ms
+				2020-07-25 13:32:43.201  INFO 4472 --- [  restartedMain] o.hibernate.jpa.internal.util.LogHelper  : HHH000204: Processing PersistenceUnitInfo [name: default]
+				2020-07-25 13:32:43.226  INFO 4472 --- [  restartedMain] com.zaxxer.hikari.HikariDataSource       : HikariPool-13 - Starting...
+				2020-07-25 13:32:43.230  INFO 4472 --- [  restartedMain] com.zaxxer.hikari.HikariDataSource       : HikariPool-13 - Start completed.
+				2020-07-25 13:32:43.230  INFO 4472 --- [  restartedMain] org.hibernate.dialect.Dialect            : HHH000400: Using dialect: org.hibernate.dialect.MySQL8Dialect
+				2020-07-25 13:32:43.305  INFO 4472 --- [  restartedMain] o.h.e.t.j.p.i.JtaPlatformInitiator       : HHH000490: Using JtaPlatform implementation: [org.hibernate.engine.transaction.jta.platform.internal.NoJtaPlatform]
+				2020-07-25 13:32:43.305  INFO 4472 --- [  restartedMain] j.LocalContainerEntityManagerFactoryBean : Initialized JPA EntityManagerFactory for persistence unit 'default'
+				2020-07-25 13:32:43.325  WARN 4472 --- [  restartedMain] JpaBaseConfiguration$JpaWebConfiguration : spring.jpa.open-in-view is enabled by default. Therefore, database queries may be performed during view rendering. Explicitly configure spring.jpa.open-in-view to disable this warning
+				2020-07-25 13:32:43.343  INFO 4472 --- [  restartedMain] com.elaon.config.TwilioInitializer       : Twilio Initialized ... congo! AC44bf2f58c126b8c3ae50fbd2503aeb3f
+				2020-07-25 13:32:43.349  INFO 4472 --- [  restartedMain] o.s.s.p.JdbcUserDetailsManager           : No authentication manager set. Reauthentication of users when changing passwords will not be performed.
+				2020-07-25 13:32:43.457  INFO 4472 --- [  restartedMain] o.s.s.web.DefaultSecurityFilterChain     : Creating filter chain: any request, [org.springframework.security.web.context.request.async.WebAsyncManagerIntegrationFilter@2fd1e402, org.springframework.security.web.context.SecurityContextPersistenceFilter@7a845b81, org.springframework.security.web.header.HeaderWriterFilter@21bb442e, org.springframework.security.web.csrf.CsrfFilter@3bd64cec, org.springframework.security.web.authentication.logout.LogoutFilter@1ffabd2a, org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter@6a377d43, org.springframework.security.web.savedrequest.RequestCacheAwareFilter@29f39a3f, org.springframework.security.web.servletapi.SecurityContextHolderAwareRequestFilter@5212211b, org.springframework.security.web.authentication.rememberme.RememberMeAuthenticationFilter@11a75f8, org.springframework.security.web.authentication.AnonymousAuthenticationFilter@71280e5f, org.springframework.security.web.session.SessionManagementFilter@73bcc836, org.springframework.security.web.access.ExceptionTranslationFilter@71f45a14, org.springframework.security.web.access.intercept.FilterSecurityInterceptor@7f24207f]
+				2020-07-25 13:32:43.504  INFO 4472 --- [  restartedMain] o.s.s.concurrent.ThreadPoolTaskExecutor  : Initializing ExecutorService 'applicationTaskExecutor'
+				2020-07-25 13:32:43.564  INFO 4472 --- [  restartedMain] o.s.b.d.a.OptionalLiveReloadServer       : LiveReload server is running on port 35729
+				2020-07-25 13:32:43.577  INFO 4472 --- [  restartedMain] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port(s): 8080 (http) with context path ''
+				2020-07-25 13:32:43.581  INFO 4472 --- [  restartedMain] com.elaon.ELoanProjectApplication        : Started ELoanProjectApplication in 1.092 seconds (JVM running for 1497.975)
+				2020-07-25 13:32:43.583  INFO 4472 --- [  restartedMain] .ConditionEvaluationDeltaLoggingListener : Condition evaluation unchanged
+				2020-07-25 13:32:48.394  INFO 4472 --- [    Thread-2226] o.s.s.concurrent.ThreadPoolTaskExecutor  : Shutting down ExecutorService 'applicationTaskExecutor'
+				2020-07-25 13:32:48.395  INFO 4472 --- [    Thread-2226] j.LocalContainerEntityManagerFactoryBean : Closing JPA EntityManagerFactory for persistence unit 'default'
+				2020-07-25 13:32:48.395  INFO 4472 --- [    Thread-2226] com.zaxxer.hikari.HikariDataSource       : HikariPool-13 - Shutdown initiated...
+				2020-07-25 13:32:48.398  INFO 4472 --- [    Thread-2226] com.zaxxer.hikari.HikariDataSource       : HikariPool-13 - Shutdown completed.
+
+				  .   ____          _            __ _ _
+				 /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+				( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+				 \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+				  '  |____| .__|_| |_|_| |_\__, | / / / /
+				 =========|_|==============|___/=/_/_/_/
+				 :: Spring Boot ::        (v2.3.1.RELEASE)
+
+				2020-07-25 13:32:48.594  INFO 4472 --- [  restartedMain] com.elaon.ELoanProjectApplication        : Starting ELoanProjectApplication on LAPTOP-OG8377K5 with PID 4472 (E:\Spring Projects\E-Loan-Project\E-Loan-Project\target\classes started by Bayvao Verma in E:\Spring Projects\E-Loan-Project\E-Loan-Project)
+				2020-07-25 13:32:48.595  INFO 4472 --- [  restartedMain] com.elaon.ELoanProjectApplication        : No active profile set, falling back to default profiles: default
+				2020-07-25 13:32:48.866  INFO 4472 --- [  restartedMain] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+				2020-07-25 13:32:48.890  INFO 4472 --- [  restartedMain] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 23ms. Found 7 JPA repository interfaces.
+				2020-07-25 13:32:49.178  INFO 4472 --- [  restartedMain] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port(s): 8080 (http)
+				2020-07-25 13:32:49.179  INFO 4472 --- [  restartedMain] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+				2020-07-25 13:32:49.179  INFO 4472 --- [  restartedMain] org.apache.catalina.core.StandardEngine  : Starting Servlet engine: [Apache Tomcat/9.0.36]
+				2020-07-25 13:32:49.257  INFO 4472 --- [  restartedMain] org.apache.jasper.servlet.TldScanner     : At least one JAR was scanned for TLDs yet contained no TLDs. Enable debug logging for this logger for a complete list of JARs that were scanned but no TLDs were found in them. Skipping unneeded JARs during scanning can improve startup time and JSP compilation time.
+				2020-07-25 13:32:49.260  INFO 4472 --- [  restartedMain] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+				2020-07-25 13:32:49.261  INFO 4472 --- [  restartedMain] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 664 ms
+				2020-07-25 13:32:49.312  INFO 4472 --- [  restartedMain] o.hibernate.jpa.internal.util.LogHelper  : HHH000204: Processing PersistenceUnitInfo [name: default]
+				2020-07-25 13:32:49.337  INFO 4472 --- [  restartedMain] com.zaxxer.hikari.HikariDataSource       : HikariPool-14 - Starting...
+				2020-07-25 13:32:49.342  INFO 4472 --- [  restartedMain] com.zaxxer.hikari.HikariDataSource       : HikariPool-14 - Start completed.
+				2020-07-25 13:32:49.342  INFO 4472 --- [  restartedMain] org.hibernate.dialect.Dialect            : HHH000400: Using dialect: org.hibernate.dialect.MySQL8Dialect
+				2020-07-25 13:32:49.415  INFO 4472 --- [  restartedMain] o.h.e.t.j.p.i.JtaPlatformInitiator       : HHH000490: Using JtaPlatform implementation: [org.hibernate.engine.transaction.jta.platform.internal.NoJtaPlatform]
+				2020-07-25 13:32:49.416  INFO 4472 --- [  restartedMain] j.LocalContainerEntityManagerFactoryBean : Initialized JPA EntityManagerFactory for persistence unit 'default'
+				2020-07-25 13:32:49.435  WARN 4472 --- [  restartedMain] JpaBaseConfiguration$JpaWebConfiguration : spring.jpa.open-in-view is enabled by default. Therefore, database queries may be performed during view rendering. Explicitly configure spring.jpa.open-in-view to disable this warning
+				2020-07-25 13:32:49.451  INFO 4472 --- [  restartedMain] com.elaon.config.TwilioInitializer       : Twilio Initialized ... congo! AC44bf2f58c126b8c3ae50fbd2503aeb3f
+				2020-07-25 13:32:49.457  INFO 4472 --- [  restartedMain] o.s.s.p.JdbcUserDetailsManager           : No authentication manager set. Reauthentication of users when changing passwords will not be performed.
+				2020-07-25 13:32:49.570  INFO 4472 --- [  restartedMain] o.s.s.web.DefaultSecurityFilterChain     : Creating filter chain: any request, [org.springframework.security.web.context.request.async.WebAsyncManagerIntegrationFilter@31e65749, org.springframework.security.web.context.SecurityContextPersistenceFilter@34eb2e80, org.springframework.security.web.header.HeaderWriterFilter@6809f7fd, org.springframework.security.web.csrf.CsrfFilter@66435bb0, org.springframework.security.web.authentication.logout.LogoutFilter@7842a6b2, org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter@53ddc2da, org.springframework.security.web.savedrequest.RequestCacheAwareFilter@31bc8472, org.springframework.security.web.servletapi.SecurityContextHolderAwareRequestFilter@16ad3ba7, org.springframework.security.web.authentication.rememberme.RememberMeAuthenticationFilter@5ab3d8a8, org.springframework.security.web.authentication.AnonymousAuthenticationFilter@3afe7af5, org.springframework.security.web.session.SessionManagementFilter@480962ea, org.springframework.security.web.access.ExceptionTranslationFilter@1262f611, org.springframework.security.web.access.intercept.FilterSecurityInterceptor@1cd2e828]
+				2020-07-25 13:32:49.622  INFO 4472 --- [  restartedMain] o.s.s.concurrent.ThreadPoolTaskExecutor  : Initializing ExecutorService 'applicationTaskExecutor'
+				2020-07-25 13:32:49.689  INFO 4472 --- [  restartedMain] o.s.b.d.a.OptionalLiveReloadServer       : LiveReload server is running on port 35729
+				2020-07-25 13:32:49.707  INFO 4472 --- [  restartedMain] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port(s): 8080 (http) with context path ''
+				2020-07-25 13:32:49.713  INFO 4472 --- [  restartedMain] com.elaon.ELoanProjectApplication        : Started ELoanProjectApplication in 1.145 seconds (JVM running for 1504.107)
+				2020-07-25 13:32:49.716  INFO 4472 --- [  restartedMain] .ConditionEvaluationDeltaLoggingListener : Condition evaluation unchanged
+				2020-07-25 13:34:08.958  INFO 4472 --- [    Thread-2428] o.s.s.concurrent.ThreadPoolTaskExecutor  : Shutting down ExecutorService 'applicationTaskExecutor'
+				2020-07-25 13:34:08.959  INFO 4472 --- [    Thread-2428] j.LocalContainerEntityManagerFactoryBean : Closing JPA EntityManagerFactory for persistence unit 'default'
+				2020-07-25 13:34:08.960  INFO 4472 --- [    Thread-2428] com.zaxxer.hikari.HikariDataSource       : HikariPool-14 - Shutdown initiated...
+				2020-07-25 13:34:08.962  INFO 4472 --- [    Thread-2428] com.zaxxer.hikari.HikariDataSource       : HikariPool-14 - Shutdown completed.
+
+				  .   ____          _            __ _ _
+				 /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+				( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+				 \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+				  '  |____| .__|_| |_|_| |_\__, | / / / /
+				 =========|_|==============|___/=/_/_/_/
+				 :: Spring Boot ::        (v2.3.1.RELEASE)
+
+				2020-07-25 13:34:09.116  INFO 4472 --- [  restartedMain] com.elaon.ELoanProjectApplication        : Starting ELoanProjectApplication on LAPTOP-OG8377K5 with PID 4472 (E:\Spring Projects\E-Loan-Project\E-Loan-Project\target\classes started by Bayvao Verma in E:\Spring Projects\E-Loan-Project\E-Loan-Project)
+				2020-07-25 13:34:09.116  INFO 4472 --- [  restartedMain] com.elaon.ELoanProjectApplication        : No active profile set, falling back to default profiles: default
+				2020-07-25 13:34:09.389  INFO 4472 --- [  restartedMain] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+				2020-07-25 13:34:09.408  INFO 4472 --- [  restartedMain] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 19ms. Found 7 JPA repository interfaces.
+				2020-07-25 13:34:09.638  INFO 4472 --- [  restartedMain] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port(s): 8080 (http)
+				2020-07-25 13:34:09.639  INFO 4472 --- [  restartedMain] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+				2020-07-25 13:34:09.639  INFO 4472 --- [  restartedMain] org.apache.catalina.core.StandardEngine  : Starting Servlet engine: [Apache Tomcat/9.0.36]
+				2020-07-25 13:34:09.716  INFO 4472 --- [  restartedMain] org.apache.jasper.servlet.TldScanner     : At least one JAR was scanned for TLDs yet contained no TLDs. Enable debug logging for this logger for a complete list of JARs that were scanned but no TLDs were found in them. Skipping unneeded JARs during scanning can improve startup time and JSP compilation time.
+				2020-07-25 13:34:09.719  INFO 4472 --- [  restartedMain] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+				2020-07-25 13:34:09.719  INFO 4472 --- [  restartedMain] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 601 ms
+				2020-07-25 13:34:09.766  INFO 4472 --- [  restartedMain] o.hibernate.jpa.internal.util.LogHelper  : HHH000204: Processing PersistenceUnitInfo [name: default]
+				2020-07-25 13:34:09.790  INFO 4472 --- [  restartedMain] com.zaxxer.hikari.HikariDataSource       : HikariPool-15 - Starting...
+				2020-07-25 13:34:09.794  INFO 4472 --- [  restartedMain] com.zaxxer.hikari.HikariDataSource       : HikariPool-15 - Start completed.
+				2020-07-25 13:34:09.795  INFO 4472 --- [  restartedMain] org.hibernate.dialect.Dialect            : HHH000400: Using dialect: org.hibernate.dialect.MySQL8Dialect
+				2020-07-25 13:34:09.859  INFO 4472 --- [  restartedMain] o.h.e.t.j.p.i.JtaPlatformInitiator       : HHH000490: Using JtaPlatform implementation: [org.hibernate.engine.transaction.jta.platform.internal.NoJtaPlatform]
+				2020-07-25 13:34:09.859  INFO 4472 --- [  restartedMain] j.LocalContainerEntityManagerFactoryBean : Initialized JPA EntityManagerFactory for persistence unit 'default'
+				2020-07-25 13:34:09.878  WARN 4472 --- [  restartedMain] JpaBaseConfiguration$JpaWebConfiguration : spring.jpa.open-in-view is enabled by default. Therefore, database queries may be performed during view rendering. Explicitly configure spring.jpa.open-in-view to disable this warning
+				2020-07-25 13:34:09.893  INFO 4472 --- [  restartedMain] com.elaon.config.TwilioInitializer       : Twilio Initialized ... congo! AC44bf2f58c126b8c3ae50fbd2503aeb3f
+				2020-07-25 13:34:09.898  INFO 4472 --- [  restartedMain] o.s.s.p.JdbcUserDetailsManager           : No authentication manager set. Reauthentication of users when changing passwords will not be performed.
+				2020-07-25 13:34:10.003  INFO 4472 --- [  restartedMain] o.s.s.web.DefaultSecurityFilterChain     : Creating filter chain: any request, [org.springframework.security.web.context.request.async.WebAsyncManagerIntegrationFilter@63832e4e, org.springframework.security.web.context.SecurityContextPersistenceFilter@2a389413, org.springframework.security.web.header.HeaderWriterFilter@2fc2b0a8, org.springframework.security.web.csrf.CsrfFilter@2454412c, org.springframework.security.web.authentication.logout.LogoutFilter@245e5d17, org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter@3fecf792, org.springframework.security.web.savedrequest.RequestCacheAwareFilter@43e912a5, org.springframework.security.web.servletapi.SecurityContextHolderAwareRequestFilter@7914bd80, org.springframework.security.web.authentication.rememberme.RememberMeAuthenticationFilter@5ea6c88e, org.springframework.security.web.authentication.AnonymousAuthenticationFilter@8c67ccb, org.springframework.security.web.session.SessionManagementFilter@2c63ed92, org.springframework.security.web.access.ExceptionTranslationFilter@7e62eb4a, org.springframework.security.web.access.intercept.FilterSecurityInterceptor@39ea5885]
+				2020-07-25 13:34:10.046  INFO 4472 --- [  restartedMain] o.s.s.concurrent.ThreadPoolTaskExecutor  : Initializing ExecutorService 'applicationTaskExecutor'
+				2020-07-25 13:34:10.105  INFO 4472 --- [  restartedMain] o.s.b.d.a.OptionalLiveReloadServer       : LiveReload server is running on port 35729
+				2020-07-25 13:34:10.118  INFO 4472 --- [  restartedMain] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port(s): 8080 (http) with context path ''
+				2020-07-25 13:34:10.122  INFO 4472 --- [  restartedMain] com.elaon.ELoanProjectApplication        : Started ELoanProjectApplication in 1.03 seconds (JVM running for 1584.517)
+				2020-07-25 13:34:10.124  INFO 4472 --- [  restartedMain] .ConditionEvaluationDeltaLoggingListener : Condition evaluation unchanged
+				2020-07-25 13:34:18.939  INFO 4472 --- [    Thread-2630] o.s.s.concurrent.ThreadPoolTaskExecutor  : Shutting down ExecutorService 'applicationTaskExecutor'
+				2020-07-25 13:34:18.940  INFO 4472 --- [    Thread-2630] j.LocalContainerEntityManagerFactoryBean : Closing JPA EntityManagerFactory for persistence unit 'default'
+				2020-07-25 13:34:18.940  INFO 4472 --- [    Thread-2630] com.zaxxer.hikari.HikariDataSource       : HikariPool-15 - Shutdown initiated...
+				2020-07-25 13:34:18.942  INFO 4472 --- [    Thread-2630] com.zaxxer.hikari.HikariDataSource       : HikariPool-15 - Shutdown completed.
+
+				  .   ____          _            __ _ _
+				 /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+				( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+				 \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+				  '  |____| .__|_| |_|_| |_\__, | / / / /
+				 =========|_|==============|___/=/_/_/_/
+				 :: Spring Boot ::        (v2.3.1.RELEASE)
+
+				2020-07-25 13:34:19.095  INFO 4472 --- [  restartedMain] com.elaon.ELoanProjectApplication        : Starting ELoanProjectApplication on LAPTOP-OG8377K5 with PID 4472 (E:\Spring Projects\E-Loan-Project\E-Loan-Project\target\classes started by Bayvao Verma in E:\Spring Projects\E-Loan-Project\E-Loan-Project)
+				2020-07-25 13:34:19.095  INFO 4472 --- [  restartedMain] com.elaon.ELoanProjectApplication        : No active profile set, falling back to default profiles: default
+				2020-07-25 13:34:19.373  INFO 4472 --- [  restartedMain] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+				2020-07-25 13:34:19.392  INFO 4472 --- [  restartedMain] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 19ms. Found 7 JPA repository interfaces.
+				2020-07-25 13:34:19.643  INFO 4472 --- [  restartedMain] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port(s): 8080 (http)
+				2020-07-25 13:34:19.644  INFO 4472 --- [  restartedMain] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+				2020-07-25 13:34:19.644  INFO 4472 --- [  restartedMain] org.apache.catalina.core.StandardEngine  : Starting Servlet engine: [Apache Tomcat/9.0.36]
+				2020-07-25 13:34:19.727  INFO 4472 --- [  restartedMain] org.apache.jasper.servlet.TldScanner     : At least one JAR was scanned for TLDs yet contained no TLDs. Enable debug logging for this logger for a complete list of JARs that were scanned but no TLDs were found in them. Skipping unneeded JARs during scanning can improve startup time and JSP compilation time.
+				2020-07-25 13:34:19.730  INFO 4472 --- [  restartedMain] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+				2020-07-25 13:34:19.730  INFO 4472 --- [  restartedMain] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 633 ms
+				2020-07-25 13:34:19.782  INFO 4472 --- [  restartedMain] o.hibernate.jpa.internal.util.LogHelper  : HHH000204: Processing PersistenceUnitInfo [name: default]
+				2020-07-25 13:34:19.807  INFO 4472 --- [  restartedMain] com.zaxxer.hikari.HikariDataSource       : HikariPool-16 - Starting...
+				2020-07-25 13:34:19.810  INFO 4472 --- [  restartedMain] com.zaxxer.hikari.HikariDataSource       : HikariPool-16 - Start completed.
+				2020-07-25 13:34:19.811  INFO 4472 --- [  restartedMain] org.hibernate.dialect.Dialect            : HHH000400: Using dialect: org.hibernate.dialect.MySQL8Dialect
+				2020-07-25 13:34:19.878  INFO 4472 --- [  restartedMain] o.h.e.t.j.p.i.JtaPlatformInitiator       : HHH000490: Using JtaPlatform implementation: [org.hibernate.engine.transaction.jta.platform.internal.NoJtaPlatform]
+				2020-07-25 13:34:19.878  INFO 4472 --- [  restartedMain] j.LocalContainerEntityManagerFactoryBean : Initialized JPA EntityManagerFactory for persistence unit 'default'
+				2020-07-25 13:34:19.895  WARN 4472 --- [  restartedMain] JpaBaseConfiguration$JpaWebConfiguration : spring.jpa.open-in-view is enabled by default. Therefore, database queries may be performed during view rendering. Explicitly configure spring.jpa.open-in-view to disable this warning
+				2020-07-25 13:34:19.911  INFO 4472 --- [  restartedMain] com.elaon.config.TwilioInitializer       : Twilio Initialized ... congo! AC44bf2f58c126b8c3ae50fbd2503aeb3f
+				2020-07-25 13:34:19.917  INFO 4472 --- [  restartedMain] o.s.s.p.JdbcUserDetailsManager           : No authentication manager set. Reauthentication of users when changing passwords will not be performed.
+				2020-07-25 13:34:20.021  INFO 4472 --- [  restartedMain] o.s.s.web.DefaultSecurityFilterChain     : Creating filter chain: any request, [org.springframework.security.web.context.request.async.WebAsyncManagerIntegrationFilter@6a546563, org.springframework.security.web.context.SecurityContextPersistenceFilter@480ed57a, org.springframework.security.web.header.HeaderWriterFilter@7740852b, org.springframework.security.web.csrf.CsrfFilter@2c9db6ec, org.springframework.security.web.authentication.logout.LogoutFilter@b60079e, org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter@42e292a2, org.springframework.security.web.savedrequest.RequestCacheAwareFilter@66e775ef, org.springframework.security.web.servletapi.SecurityContextHolderAwareRequestFilter@15fdcdc5, org.springframework.security.web.authentication.rememberme.RememberMeAuthenticationFilter@33550683, org.springframework.security.web.authentication.AnonymousAuthenticationFilter@22cad2d0, org.springframework.security.web.session.SessionManagementFilter@965286c, org.springframework.security.web.access.ExceptionTranslationFilter@2b30befa, org.springframework.security.web.access.intercept.FilterSecurityInterceptor@5a725485]
+				2020-07-25 13:34:20.064  INFO 4472 --- [  restartedMain] o.s.s.concurrent.ThreadPoolTaskExecutor  : Initializing ExecutorService 'applicationTaskExecutor'
+				2020-07-25 13:34:20.122  INFO 4472 --- [  restartedMain] o.s.b.d.a.OptionalLiveReloadServer       : LiveReload server is running on port 35729
+				2020-07-25 13:34:20.135  INFO 4472 --- [  restartedMain] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port(s): 8080 (http) with context path ''
+				2020-07-25 13:34:20.139  INFO 4472 --- [  restartedMain] com.elaon.ELoanProjectApplication        : Started ELoanProjectApplication in 1.073 seconds (JVM running for 1594.533)
+				2020-07-25 13:34:20.141  INFO 4472 --- [  restartedMain] .ConditionEvaluationDeltaLoggingListener : Condition evaluation unchanged
+				2020-07-25 13:34:35.033  INFO 4472 --- [    Thread-2832] o.s.s.concurrent.ThreadPoolTaskExecutor  : Shutting down ExecutorService 'applicationTaskExecutor'
+				2020-07-25 13:34:35.033  INFO 4472 --- [    Thread-2832] j.LocalContainerEntityManagerFactoryBean : Closing JPA EntityManagerFactory for persistence unit 'default'
+				2020-07-25 13:34:35.034  INFO 4472 --- [    Thread-2832] com.zaxxer.hikari.HikariDataSource       : HikariPool-16 - Shutdown initiated...
+				2020-07-25 13:34:35.035  INFO 4472 --- [    Thread-2832] com.zaxxer.hikari.HikariDataSource       : HikariPool-16 - Shutdown completed.
+
+				  .   ____          _            __ _ _
+				 /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+				( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+				 \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+				  '  |____| .__|_| |_|_| |_\__, | / / / /
+				 =========|_|==============|___/=/_/_/_/
+				 :: Spring Boot ::        (v2.3.1.RELEASE)
+
+				2020-07-25 13:34:35.284  INFO 4472 --- [  restartedMain] com.elaon.ELoanProjectApplication        : Starting ELoanProjectApplication on LAPTOP-OG8377K5 with PID 4472 (E:\Spring Projects\E-Loan-Project\E-Loan-Project\target\classes started by Bayvao Verma in E:\Spring Projects\E-Loan-Project\E-Loan-Project)
+				2020-07-25 13:34:35.284  INFO 4472 --- [  restartedMain] com.elaon.ELoanProjectApplication        : No active profile set, falling back to default profiles: default
+				2020-07-25 13:34:35.546  INFO 4472 --- [  restartedMain] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+				2020-07-25 13:34:35.564  INFO 4472 --- [  restartedMain] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 18ms. Found 7 JPA repository interfaces.
+				2020-07-25 13:34:35.818  INFO 4472 --- [  restartedMain] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port(s): 8080 (http)
+				2020-07-25 13:34:35.818  INFO 4472 --- [  restartedMain] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+				2020-07-25 13:34:35.819  INFO 4472 --- [  restartedMain] org.apache.catalina.core.StandardEngine  : Starting Servlet engine: [Apache Tomcat/9.0.36]
+				2020-07-25 13:34:35.896  INFO 4472 --- [  restartedMain] org.apache.jasper.servlet.TldScanner     : At least one JAR was scanned for TLDs yet contained no TLDs. Enable debug logging for this logger for a complete list of JARs that were scanned but no TLDs were found in them. Skipping unneeded JARs during scanning can improve startup time and JSP compilation time.
+				2020-07-25 13:34:35.899  INFO 4472 --- [  restartedMain] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+				2020-07-25 13:34:35.899  INFO 4472 --- [  restartedMain] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 612 ms
+				2020-07-25 13:34:35.949  INFO 4472 --- [  restartedMain] o.hibernate.jpa.internal.util.LogHelper  : HHH000204: Processing PersistenceUnitInfo [name: default]
+				2020-07-25 13:34:35.973  INFO 4472 --- [  restartedMain] com.zaxxer.hikari.HikariDataSource       : HikariPool-17 - Starting...
+				2020-07-25 13:34:35.977  INFO 4472 --- [  restartedMain] com.zaxxer.hikari.HikariDataSource       : HikariPool-17 - Start completed.
+				2020-07-25 13:34:35.977  INFO 4472 --- [  restartedMain] org.hibernate.dialect.Dialect            : HHH000400: Using dialect: org.hibernate.dialect.MySQL8Dialect
+				2020-07-25 13:34:36.045  INFO 4472 --- [  restartedMain] o.h.e.t.j.p.i.JtaPlatformInitiator       : HHH000490: Using JtaPlatform implementation: [org.hibernate.engine.transaction.jta.platform.internal.NoJtaPlatform]
+				2020-07-25 13:34:36.046  INFO 4472 --- [  restartedMain] j.LocalContainerEntityManagerFactoryBean : Initialized JPA EntityManagerFactory for persistence unit 'default'
+				2020-07-25 13:34:36.067  WARN 4472 --- [  restartedMain] JpaBaseConfiguration$JpaWebConfiguration : spring.jpa.open-in-view is enabled by default. Therefore, database queries may be performed during view rendering. Explicitly configure spring.jpa.open-in-view to disable this warning
+				2020-07-25 13:34:36.087  INFO 4472 --- [  restartedMain] com.elaon.config.TwilioInitializer       : Twilio Initialized ... congo! AC44bf2f58c126b8c3ae50fbd2503aeb3f
+				2020-07-25 13:34:36.093  INFO 4472 --- [  restartedMain] o.s.s.p.JdbcUserDetailsManager           : No authentication manager set. Reauthentication of users when changing passwords will not be performed.
+				2020-07-25 13:34:36.200  INFO 4472 --- [  restartedMain] o.s.s.web.DefaultSecurityFilterChain     : Creating filter chain: any request, [org.springframework.security.web.context.request.async.WebAsyncManagerIntegrationFilter@249c4068, org.springframework.security.web.context.SecurityContextPersistenceFilter@74ed1c82, org.springframework.security.web.header.HeaderWriterFilter@19d4d84c, org.springframework.security.web.csrf.CsrfFilter@1942286e, org.springframework.security.web.authentication.logout.LogoutFilter@6d795bb8, org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter@77d09984, org.springframework.security.web.savedrequest.RequestCacheAwareFilter@102ec628, org.springframework.security.web.servletapi.SecurityContextHolderAwareRequestFilter@2f076ad9, org.springframework.security.web.authentication.rememberme.RememberMeAuthenticationFilter@a1d9feb, org.springframework.security.web.authentication.AnonymousAuthenticationFilter@27c72855, org.springframework.security.web.session.SessionManagementFilter@7ce45a28, org.springframework.security.web.access.ExceptionTranslationFilter@2e3943d4, org.springframework.security.web.access.intercept.FilterSecurityInterceptor@60fc748a]
+				2020-07-25 13:34:36.252  INFO 4472 --- [  restartedMain] o.s.s.concurrent.ThreadPoolTaskExecutor  : Initializing ExecutorService 'applicationTaskExecutor'
+				2020-07-25 13:34:36.322  INFO 4472 --- [  restartedMain] o.s.b.d.a.OptionalLiveReloadServer       : LiveReload server is running on port 35729
+				2020-07-25 13:34:36.337  INFO 4472 --- [  restartedMain] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port(s): 8080 (http) with context path ''
+				2020-07-25 13:34:36.341  INFO 4472 --- [  restartedMain] com.elaon.ELoanProjectApplication        : Started ELoanProjectApplication in 1.084 seconds (JVM running for 1610.735)
+				2020-07-25 13:34:36.342  INFO 4472 --- [  restartedMain] .ConditionEvaluationDeltaLoggingListener : Condition evaluation unchanged
+				2020-07-25 13:34:49.145  INFO 4472 --- [    Thread-3034] o.s.s.concurrent.ThreadPoolTaskExecutor  : Shutting down ExecutorService 'applicationTaskExecutor'
+				2020-07-25 13:34:49.146  INFO 4472 --- [    Thread-3034] j.LocalContainerEntityManagerFactoryBean : Closing JPA EntityManagerFactory for persistence unit 'default'
+				2020-07-25 13:34:49.146  INFO 4472 --- [    Thread-3034] com.zaxxer.hikari.HikariDataSource       : HikariPool-17 - Shutdown initiated...
+				2020-07-25 13:34:49.148  INFO 4472 --- [    Thread-3034] com.zaxxer.hikari.HikariDataSource       : HikariPool-17 - Shutdown completed.
+
+				  .   ____          _            __ _ _
+				 /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+				( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+				 \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+				  '  |____| .__|_| |_|_| |_\__, | / / / /
+				 =========|_|==============|___/=/_/_/_/
+				 :: Spring Boot ::        (v2.3.1.RELEASE)
+
+				2020-07-25 13:34:49.586  INFO 4472 --- [  restartedMain] com.elaon.ELoanProjectApplication        : Starting ELoanProjectApplication on LAPTOP-OG8377K5 with PID 4472 (E:\Spring Projects\E-Loan-Project\E-Loan-Project\target\classes started by Bayvao Verma in E:\Spring Projects\E-Loan-Project\E-Loan-Project)
+				2020-07-25 13:34:49.586  INFO 4472 --- [  restartedMain] com.elaon.ELoanProjectApplication        : No active profile set, falling back to default profiles: default
+				2020-07-25 13:34:49.859  INFO 4472 --- [  restartedMain] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+				2020-07-25 13:34:49.878  INFO 4472 --- [  restartedMain] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 19ms. Found 7 JPA repository interfaces.
+				2020-07-25 13:34:50.134  INFO 4472 --- [  restartedMain] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port(s): 8080 (http)
+				2020-07-25 13:34:50.135  INFO 4472 --- [  restartedMain] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+				2020-07-25 13:34:50.135  INFO 4472 --- [  restartedMain] org.apache.catalina.core.StandardEngine  : Starting Servlet engine: [Apache Tomcat/9.0.36]
+				2020-07-25 13:34:50.226  INFO 4472 --- [  restartedMain] org.apache.jasper.servlet.TldScanner     : At least one JAR was scanned for TLDs yet contained no TLDs. Enable debug logging for this logger for a complete list of JARs that were scanned but no TLDs were found in them. Skipping unneeded JARs during scanning can improve startup time and JSP compilation time.
+				2020-07-25 13:34:50.229  INFO 4472 --- [  restartedMain] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+				2020-07-25 13:34:50.229  INFO 4472 --- [  restartedMain] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 640 ms
+				2020-07-25 13:34:50.285  INFO 4472 --- [  restartedMain] o.hibernate.jpa.internal.util.LogHelper  : HHH000204: Processing PersistenceUnitInfo [name: default]
+				2020-07-25 13:34:50.311  INFO 4472 --- [  restartedMain] com.zaxxer.hikari.HikariDataSource       : HikariPool-18 - Starting...
+				2020-07-25 13:34:50.316  INFO 4472 --- [  restartedMain] com.zaxxer.hikari.HikariDataSource       : HikariPool-18 - Start completed.
+				2020-07-25 13:34:50.316  INFO 4472 --- [  restartedMain] org.hibernate.dialect.Dialect            : HHH000400: Using dialect: org.hibernate.dialect.MySQL8Dialect
+				2020-07-25 13:34:50.386  INFO 4472 --- [  restartedMain] o.h.e.t.j.p.i.JtaPlatformInitiator       : HHH000490: Using JtaPlatform implementation: [org.hibernate.engine.transaction.jta.platform.internal.NoJtaPlatform]
+				2020-07-25 13:34:50.386  INFO 4472 --- [  restartedMain] j.LocalContainerEntityManagerFactoryBean : Initialized JPA EntityManagerFactory for persistence unit 'default'
+				2020-07-25 13:34:50.405  WARN 4472 --- [  restartedMain] JpaBaseConfiguration$JpaWebConfiguration : spring.jpa.open-in-view is enabled by default. Therefore, database queries may be performed during view rendering. Explicitly configure spring.jpa.open-in-view to disable this warning
+				2020-07-25 13:34:50.422  INFO 4472 --- [  restartedMain] com.elaon.config.TwilioInitializer       : Twilio Initialized ... congo! AC44bf2f58c126b8c3ae50fbd2503aeb3f
+				2020-07-25 13:34:50.428  INFO 4472 --- [  restartedMain] o.s.s.p.JdbcUserDetailsManager           : No authentication manager set. Reauthentication of users when changing passwords will not be performed.
+				2020-07-25 13:34:50.533  INFO 4472 --- [  restartedMain] o.s.s.web.DefaultSecurityFilterChain     : Creating filter chain: any request, [org.springframework.security.web.context.request.async.WebAsyncManagerIntegrationFilter@61b5a5d9, org.springframework.security.web.context.SecurityContextPersistenceFilter@3c7e59a6, org.springframework.security.web.header.HeaderWriterFilter@7dd76902, org.springframework.security.web.csrf.CsrfFilter@f42e6d, org.springframework.security.web.authentication.logout.LogoutFilter@713f58fe, org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter@1ee01646, org.springframework.security.web.savedrequest.RequestCacheAwareFilter@20c341f4, org.springframework.security.web.servletapi.SecurityContextHolderAwareRequestFilter@669ab397, org.springframework.security.web.authentication.rememberme.RememberMeAuthenticationFilter@c6fb883, org.springframework.security.web.authentication.AnonymousAuthenticationFilter@5e1f19b7, org.springframework.security.web.session.SessionManagementFilter@1d589b26, org.springframework.security.web.access.ExceptionTranslationFilter@d123673, org.springframework.security.web.access.intercept.FilterSecurityInterceptor@6d7a4dfd]
+				2020-07-25 13:34:50.571  INFO 4472 --- [  restartedMain] o.s.s.concurrent.ThreadPoolTaskExecutor  : Initializing ExecutorService 'applicationTaskExecutor'
+				2020-07-25 13:34:50.630  INFO 4472 --- [  restartedMain] o.s.b.d.a.OptionalLiveReloadServer       : LiveReload server is running on port 35729
+				2020-07-25 13:34:50.644  INFO 4472 --- [  restartedMain] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port(s): 8080 (http) with context path ''
+				2020-07-25 13:34:50.647  INFO 4472 --- [  restartedMain] com.elaon.ELoanProjectApplication        : Started ELoanProjectApplication in 1.085 seconds (JVM running for 1625.041)
+				2020-07-25 13:34:50.649  INFO 4472 --- [  restartedMain] .ConditionEvaluationDeltaLoggingListener : Condition evaluation unchanged
+				2020-07-25 13:35:03.458  INFO 4472 --- [    Thread-3236] o.s.s.concurrent.ThreadPoolTaskExecutor  : Shutting down ExecutorService 'applicationTaskExecutor'
+				2020-07-25 13:35:03.459  INFO 4472 --- [    Thread-3236] j.LocalContainerEntityManagerFactoryBean : Closing JPA EntityManagerFactory for persistence unit 'default'
+				2020-07-25 13:35:03.460  INFO 4472 --- [    Thread-3236] com.zaxxer.hikari.HikariDataSource       : HikariPool-18 - Shutdown initiated...
+				2020-07-25 13:35:03.461  INFO 4472 --- [    Thread-3236] com.zaxxer.hikari.HikariDataSource       : HikariPool-18 - Shutdown completed.
+);
+		
+		return "";
+	}
+}
+
+
+
+
+
+
+
+
+
+

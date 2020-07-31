@@ -1,0 +1,5 @@
+package com.elaon.security.validation;
+
+public class PhoneNumberValidator implements ConstraintValidator<ValidPhoneNumber, String>{
+
+}

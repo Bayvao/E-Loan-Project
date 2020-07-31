@@ -1,0 +1,5 @@
+package com.elaon.service;
+
+public interface LoanPaymentService {
+
+}

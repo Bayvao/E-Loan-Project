@@ -1,0 +1,11 @@
+package com.elaon.security.validation;
+
+import javax.validation.ConstraintValidator;
+
+import org.springframework.beans.factory.annotation.Configurable;
+
+
+@Configurable
+public class PhoneNumberValidator implements ConstraintValidator<ValidPhoneNumber, String>{
+
+}

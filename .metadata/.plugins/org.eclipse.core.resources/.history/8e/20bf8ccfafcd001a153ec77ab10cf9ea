@@ -1,0 +1,15 @@
+package com.elaon.service;
+
+import javax.validation.Valid;
+
+import com.elaon.entity.LoanStatus;
+import com.elaon.model.AcceptLoan;
+import com.elaon.model.Amortization;
+
+public interface LoanAcceptanceService {
+
+
+	public Long updateAndAdd(LoanStatus ls, AcceptLoan lAcc, @Valid Amortization loanAmor);
+
+	public void rejectLoan(Long loanId);
+}

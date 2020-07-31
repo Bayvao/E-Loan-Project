@@ -1,0 +1,5 @@
+package com.elaon.model;
+
+public class SmsRequest {
+
+}

@@ -1,0 +1,19 @@
+package com.elaon.service;
+
+import org.springframework.beans.factory.annotation.Autowired;
+
+import com.elaon.model.Payment;
+
+public class LoanPaymentServiceImpl implements LoanPaymentService {
+
+	@Autowired
+	LoanPaymentRepository lpr;
+	
+	@Override
+	public void addPayment(Payment payment) {
+		
+		
+
+	}
+
+}

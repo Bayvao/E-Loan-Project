@@ -1,0 +1,128 @@
+package com.elaon;
+
+import java.util.Date;
+import java.util.List;
+
+import javax.transaction.Transactional;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.annotation.Rollback;
+
+import com.elaon.dao.BorrowerRepository;
+import com.elaon.dao.LoanRepository;
+import com.elaon.dao.LoanStatusRepository;
+import com.elaon.dao.PropertyRepository;
+import com.elaon.entity.Borrower;
+import com.elaon.entity.Loan;
+import com.elaon.entity.LoanStatus;
+import com.elaon.entity.Property;
+
+@SpringBootTest
+class ELoanProjectApplicationTests {
+
+	@Autowired
+	BorrowerRepository br;
+
+	@Autowired
+	PropertyRepository pr;
+
+	@Autowired
+	LoanRepository lr;
+	
+	@Autowired
+	LoanStatusRepository lsRepo;
+
+	@Test
+	void contextLoads() {
+	}
+
+	@Test
+	public void createBorrower() {
+
+		Borrower b = new Borrower();
+
+		b.setName("Harsh");
+		b.setBusinessStructure("Organizational");
+		b.setBillingIndicator("Non Salaried");
+		b.setTaxIndicator("Non Tax Payer");
+		b.setBorrowerAddress("Asansol");
+		b.setBorrowerContactNo("8759205645");
+		b.setBorrowerEmail("abc@gmail.com");
+
+		br.save(b);
+	}
+
+	@Test
+	public void createProperty() {
+
+		Property p = new Property();
+		p.setAcresOfLand(100L);
+		p.setLandValue(500000L);
+		p.setProducedOnLand(20000L);
+		p.setAppraisedBy("Anisha");
+		p.setValuationDate("21-10-2012");
+		p.setFieldRepresentative("Vitika");
+		p.setCountry("USA");
+		p.setState("California");
+
+		pr.save(p);
+	}
+
+	@Test
+	public void createLoan() {
+		Borrower b = new Borrower();
+
+		b.setName("Harsh");
+		b.setBusinessStructure("Organizational");
+		b.setBillingIndicator("Non Salaried");
+		b.setTaxIndicator("Non Tax Payer");
+		b.setBorrowerAddress("Asansol");
+		b.setBorrowerContactNo("8759205645");
+		b.setBorrowerEmail("abc@gmail.com");
+
+		Date d = new Date(21 - 10 - 2012);
+		Property p = new Property();
+		p.setAcresOfLand(100L);
+		p.setLandValue(500000L);
+		p.setProducedOnLand(20000L);
+		p.setAppraisedBy("Anisha");
+		p.setValuationDate(d);
+		p.setFieldRepresentative("Vitika");
+		p.setCountry("USA");
+		p.setState("California");
+
+		Loan l = new Loan();
+		Date ld = new Date(06 - 07 - 2020);
+		l.setLoanType("Personal Loan");
+		l.setLoanAmount(100000L);
+		l.setLoanDate(ld);
+		l.setBorrower(b);
+		l.setProperty(p);
+		
+		LoanStatus ls = new LoanStatus();
+		ls.setApprovalStatus("No");
+		ls.setLoan(l);
+		
+		lsRepo.save(ls);
+
+	}
+	
+	@Test
+	public void getEverything() {
+		List<LoanStatus> ls = lsRepo.getLoanStatusByApprovalStatus("No");
+		ls.forEach(System.out::println);
+	}
+	
+	@Test
+	@Transactional
+	@Rollback(false)
+	public void updateStatus() {
+		Long id = 1L;
+		lsRepo.updateLoanStatus("No", id);
+		System.out.println("Update Complete");
+		
+	}
+
+}

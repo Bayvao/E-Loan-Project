@@ -1,0 +1,77 @@
+package com.elaon.entity;
+
+import javax.persistence.Column;
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.Id;
+import javax.persistence.Table;
+
+import org.hibernate.annotations.GenericGenerator;
+import org.springframework.format.annotation.DateTimeFormat;
+
+@Entity
+@Table(name="loan_acceptance")
+public class LoanAcceptance {
+
+	
+	@GenericGenerator(name="l_no", strategy = "com.elaon.CustomIdGenerator")
+	@GeneratedValue(generator = "l_no")
+	@Id
+	//@GeneratedValue(strategy = GenerationType.SEQUENCE)
+	@Column(name="loan_number")
+	private Long loanNumber;
+	
+	@Column(name="regional_office")
+	private String regionalOffice;
+	
+	@Column(name="sanctioned_date")
+	@DateTimeFormat(pattern = "dd-mm-yyyy")
+	private String sanctionedDate;
+	
+	@Column(name="sanctioning_offical")
+	private String sanctioningOffical;
+	
+	@Column(name="loan_id")
+	private Long loanId;
+
+	public Long getLoanNumber() {
+		return loanNumber;
+	}
+
+	public void setLoanNumber(Long loanNumber) {
+		this.loanNumber = loanNumber;
+	}
+
+	public String getRegionalOffice() {
+		return regionalOffice;
+	}
+
+	public void setRegionalOffice(String regionalOffice) {
+		this.regionalOffice = regionalOffice;
+	}
+
+	public String getSanctionedDate() {
+		return sanctionedDate;
+	}
+
+	public void setSanctionedDate(String sanctionedDate) {
+		this.sanctionedDate = sanctionedDate;
+	}
+
+	public String getSanctioningOffical() {
+		return sanctioningOffical;
+	}
+
+	public void setSanctioningOffical(String sanctioningOffical) {
+		this.sanctioningOffical = sanctioningOffical;
+	}
+
+	public Long getLoanId() {
+		return loanId;
+	}
+
+	public void setLoanId(Long loanId) {
+		this.loanId = loanId;
+	}
+
+}

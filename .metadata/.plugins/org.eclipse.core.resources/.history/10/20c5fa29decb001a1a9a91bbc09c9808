@@ -1,0 +1,89 @@
+package com.elaon.model;
+
+import javax.validation.constraints.NotNull;
+
+import com.elaon.security.validation.ValidEmail;
+import com.elaon.security.validation.ValidPhoneNumber;
+
+public class LoanBorrower {
+
+	
+	@NotNull(message = "required")
+	private String bName;
+	
+
+	private String bStructure;
+	
+
+	private String bIndicator;
+	
+
+	private String tIndicator;
+	
+	@NotNull(message = "required")
+	private String bAddress;
+	
+	@NotNull
+	@ValidPhoneNumber
+	private String bContactNo;
+	
+	@NotNull
+	@ValidEmail
+	private String bEmail;
+
+	public String getbName() {
+		return bName;
+	}
+
+	public void setbName(String bName) {
+		this.bName = bName;
+	}
+
+	public String getbStructure() {
+		return bStructure;
+	}
+
+	public void setbStructure(String bStructure) {
+		this.bStructure = bStructure;
+	}
+
+	public String getbIndicator() {
+		return bIndicator;
+	}
+
+	public void setbIndicator(String bIndicator) {
+		this.bIndicator = bIndicator;
+	}
+
+	public String gettIndicator() {
+		return tIndicator;
+	}
+
+	public void settIndicator(String tIndicator) {
+		this.tIndicator = tIndicator;
+	}
+
+	public String getbAddress() {
+		return bAddress;
+	}
+
+	public void setbAddress(String bAddress) {
+		this.bAddress = bAddress;
+	}
+
+	public String getbContactNo() {
+		return bContactNo;
+	}
+
+	public void setbContactNo(String bContactNo) {
+		this.bContactNo = bContactNo;
+	}
+
+	public String getbEmail() {
+		return bEmail;
+	}
+
+	public void setbEmail(String bEmail) {
+		this.bEmail = bEmail;
+	}
+}

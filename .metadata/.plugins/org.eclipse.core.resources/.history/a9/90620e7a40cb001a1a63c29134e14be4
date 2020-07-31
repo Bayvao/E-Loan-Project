@@ -1,0 +1,15 @@
+package com.elaon.entity;
+
+import java.util.Date;
+
+import javax.validation.constraints.NotNull;
+
+public class LoanPayment {
+
+	private Long loanNumber;
+	private Double amountPaid;
+	private String modeOfPayment;
+	private Long chequeOrDraftNumber;
+	private Date dateOfPayment;
+	
+}

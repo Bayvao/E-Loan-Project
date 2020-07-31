@@ -1,0 +1,264 @@
+package com.elaon.controller;
+
+import java.util.Collection;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.logging.Logger;
+
+import javax.annotation.PostConstruct;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpSession;
+import javax.validation.Valid;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.propertyeditors.StringTrimmerEditor;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.AuthorityUtils;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.userdetails.User;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.provisioning.JdbcUserDetailsManager;
+import org.springframework.security.provisioning.UserDetailsManager;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.validation.BindingResult;
+import org.springframework.web.bind.WebDataBinder;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.InitBinder;
+import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+
+import com.elaon.entity.EloanUser;
+
+@Controller
+@RequestMapping("/admin")
+public class AdminController {
+
+	@Autowired
+	private UserDetailsManager userDetailsManager;
+
+	@Autowired
+	JdbcUserDetailsManager manager;
+
+	private PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
+
+	private Logger logger = Logger.getLogger(getClass().getName());
+
+	private Map<String, String> roles;
+
+	@InitBinder
+	public void initBinder(WebDataBinder dataBinder) {
+
+		StringTrimmerEditor stringTrimmerEditor = new StringTrimmerEditor(true);
+
+		dataBinder.registerCustomEditor(String.class, stringTrimmerEditor);
+	}
+
+	@PostConstruct
+	protected void loadRoles() {
+
+		// using hashmap, could also read this info from a database
+
+		roles = new LinkedHashMap<String, String>();
+
+		// key=the role, value=display to user
+		roles.put("ROLE_CLERK", "Clerk");
+		roles.put("ROLE_MANAGER", "Manager");
+		roles.put("ROLE_ADMIN", "Admin");
+	}
+
+	@GetMapping("/admin-home")
+	public String adminHome() {
+
+		return "adm-home";
+	}
+
+	@GetMapping("/regitserUserPage")
+	public String showRegisterNewUserPage(Model model) {
+
+		EloanUser eloanUser = new EloanUser();
+
+		model.addAttribute("eloanUser", eloanUser);
+
+		model.addAttribute("roles", roles);
+
+		return "register-user";
+	}
+
+	@PostMapping("/processRegistrationForm")
+	public String processEloanRegisterationForm(@Valid @ModelAttribute("eloanUser") EloanUser eloanUser,
+			BindingResult bindingResult, Model model, HttpSession session) {
+
+		String userName = eloanUser.getUserName();
+
+		logger.info("Processing Registration Form for: " + userName);
+
+		// form validation
+		if (bindingResult.hasErrors()) {
+
+			model.addAttribute("eloanUser", new EloanUser());
+
+			// add roles to the model for form display
+			model.addAttribute("roles", roles);
+
+			model.addAttribute("registrationError", "Username/Password cannot be empty.");
+
+			logger.info("Username/Password cannot be empty.");
+
+			return "register-user";
+		}
+
+		// check the database if user already exists
+		boolean userExists = doesUserExist(userName);
+
+		if (userExists) {
+
+			model.addAttribute("eloanUser", new EloanUser());
+
+			// add roles to the model for form display
+			model.addAttribute("roles", roles);
+
+			model.addAttribute("registationError", "Username already exists.");
+
+			logger.warning("Username already exists");
+
+			return "register-user";
+		}
+
+		//
+		// after passing all of the validation check
+		// add user to the database
+		//
+
+		// encrypt the password
+		String encodedPassword = passwordEncoder.encode(eloanUser.getPassword());
+
+		// prepend the enconding algorithm id
+		encodedPassword = "{bcrypt}" + encodedPassword;
+
+		List<GrantedAuthority> authorities = AuthorityUtils.createAuthorityList();
+
+		String formRole = eloanUser.getFormRole();
+
+		authorities.add(new SimpleGrantedAuthority(formRole));
+
+		// create user object (from spring security framework)
+		User user = new User(userName, encodedPassword, authorities);
+
+		// save user in the database
+		userDetailsManager.createUser(user);
+
+		logger.info("Successfully created user: " + userName);
+
+		return "registration-confirmation";
+
+	}
+
+	@GetMapping("/ChangePasswordPage")
+	public String showChangeUserPasswordPage(Model model) {
+
+		model.addAttribute("eloanUser", new EloanUser());
+		return "change-user-password";
+	}
+
+	@PostMapping("/processChangePasswordForm")
+	public String processChangePasswordForm(@Valid @ModelAttribute("eloanUser") EloanUser eloanUser,
+			BindingResult bindingResult, Model model, HttpSession session) {
+
+		String userName = eloanUser.getUserName();
+
+		logger.info("Processing ChangePassword Form for: " + userName);
+
+		// form validation
+		if (bindingResult.hasErrors()) {
+
+			model.addAttribute("eloanUser", new EloanUser());
+
+			model.addAttribute("registrationError", "Username/Password cannot be empty.");
+
+			logger.info("Username/Password cannot be empty.");
+
+			return "change-user-password";
+		}
+
+		// check the database if user already exists
+		boolean userExists = doesUserExist(userName);
+		String roles = null;
+
+		if (userExists) {
+
+			UserDetails user = userDetailsManager.loadUserByUsername(userName);
+
+			Collection<? extends GrantedAuthority> role = user.getAuthorities();
+
+			for (GrantedAuthority s : role) {
+				roles = s.getAuthority();
+			}
+
+			// encrypt the password
+			String newPassword = passwordEncoder.encode(eloanUser.getPassword());
+
+			// prepend the enconding algorithm id
+			newPassword = "{bcrypt}" + newPassword;
+
+			List<GrantedAuthority> authorities = AuthorityUtils.createAuthorityList();
+
+			authorities.add(new SimpleGrantedAuthority(roles));
+
+			// create user object to updateUser
+			User updateUser = new User(userName, newPassword, authorities);
+
+			userDetailsManager.updateUser(updateUser);
+
+			logger.info("Update complete for User: " + userName);
+
+		}
+
+		return "registration-confirmation";
+
+	}
+
+	@GetMapping("/DeleteUserPage")
+	public String deleteUserPage(Model model) {
+
+		model.addAttribute("eloanUser", new EloanUser());
+		return "delete-user";
+	}
+
+	@PostMapping("/processDeleteUser")
+	public String deleteUser(Model model, HttpServletRequest request) {
+
+		String username = request.getParameter("userName");
+
+		if(username.isEmpty()) {
+			System.out.println();
+			System.out.println("errors");
+			model.addAttribute("registrationError", "Username cannot be empty.");
+
+			logger.info("Username/Password cannot be empty.");
+		}
+			
+		System.out.println(username);
+		
+		boolean exists = doesUserExist(username);
+		return "registration-confirmation";
+
+	}
+
+	private boolean doesUserExist(String userName) {
+
+		logger.info("Checking if user exists: " + userName);
+
+		// check the database if the user already exists
+		boolean exists = userDetailsManager.userExists(userName);
+
+		logger.info("User: " + userName + ", exists: " + exists);
+
+		return exists;
+	}
+
+}

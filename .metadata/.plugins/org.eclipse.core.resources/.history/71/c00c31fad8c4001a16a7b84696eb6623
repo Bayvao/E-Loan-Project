@@ -1,0 +1,96 @@
+<%@ page language="java" contentType="text/html; charset=ISO-8859-1"
+    pageEncoding="ISO-8859-1"%>
+<%@ taglib prefix="form" uri="http://www.springframework.org/tags/form" %>
+<%@ taglib prefix="security" uri="http://www.springframework.org/security/tags" %>
+
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="ISO-8859-1">
+<title>Insert title here</title>
+<style>
+.error {
+	color: red;
+}
+</style>
+<script>
+function myFunction() {
+	  var today = new Date();
+	  var dd = String(today.getDate()).padStart(2, '0');
+	  var mm = String(today.getMonth() + 1).padStart(2, '0'); //January is 0!
+	  var yyyy = today.getFullYear();
+
+	  today = dd + '/' + mm + '/' + yyyy;
+	  document.getElementById("sandate").value = today;
+}
+
+
+</script>
+
+</head>
+<body>
+
+<!-- Add a logout button -->
+	<form:form action="${pageContext.request.contextPath}/logout" 
+			   method="POST">
+	
+		<input type="submit" value="Logout" />
+	
+	</form:form>
+	
+	<hr>
+	
+	<!-- display user name and role -->
+	
+	<p>
+	
+	<security:authorize access="isAuthenticated()">  
+        User: <security:authentication property="principal.username" />
+        Role(s): <security:authentication property="principal.authorities" />
+    </security:authorize>
+    
+    <p>
+    
+   <form:form
+		action="${pageContext.request.contextPath}/manager/processLoanAcceptance"
+		modelAttribute="acceptLoan">
+		<div>
+			<label>Regional Number:</label>
+			<form:input path="regOffice" placeholder="Regional Office"
+				class="form-control" />
+			<form:errors path="regOffice" cssClass="error" />
+		</div>
+		<br>
+		<div>
+			<label>Sanctioning Date:</label>
+			<form:input path="sancDate" value = "${d}" placeholder="Sanctioned Date"
+				id="sandate" readonly="true"/>
+			<form:errors path="sancDate" cssClass="error" />
+		</div>
+		<div>
+			<label>Sanctioning Official:</label>
+			<form:input path="sancOffical" placeholder="Regional Office"
+				class="form-control" />
+			<form:errors path="sancOffical" cssClass="error" />
+		</div>
+		<div>
+			<label>Regional Number:</label>
+			<form:input path="regOffice" placeholder="Regional Office"
+				class="form-control" />
+			<form:errors path="regOffice" cssClass="error" />
+		</div>
+		<div>
+			<label>Loan Id:</label>
+			<form:input path="loanId" value="${loanDetails.loan.loanId}" placeholder="Loan Id"
+				class="form-control" readonly="true"/>
+			<form:errors path="loanId" cssClass="error" />
+		</div>
+		<br>
+		<div>
+			<button type="submit" class="btn btn-blue text-center">Submit</button>
+		</div>
+	</form:form>
+
+
+</body>
+</html>

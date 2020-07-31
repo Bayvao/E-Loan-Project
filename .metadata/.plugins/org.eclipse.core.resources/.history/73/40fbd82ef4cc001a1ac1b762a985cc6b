@@ -1,0 +1,6 @@
+package com.elaon.entity;
+
+@Embeddable
+public class DateOfPayment {
+
+}

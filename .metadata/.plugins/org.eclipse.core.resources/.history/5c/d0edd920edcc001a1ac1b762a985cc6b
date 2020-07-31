@@ -1,0 +1,14 @@
+package com.elaon.service;
+
+import com.elaon.model.SmsRequest;
+
+
+public class MailMessageSender implements MailSender{
+
+	@Override
+	public void sendMail(SmsRequest smsRequest) {
+		// TODO Auto-generated method stub
+		
+	}
+
+}
